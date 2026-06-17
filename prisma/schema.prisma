@@ -1,0 +1,340 @@
+// SponsorshipIQ — Database Schema
+// PostgreSQL + Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==========================================
+// AUTH & USER
+// ==========================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
+  image         String?
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts              Account[]
+  sessions              Session[]
+  llmConfig             LlmConfig?
+  festProfiles          FestProfile[]
+  emailAccounts         EmailAccount[]
+  sponsorLists          SponsorList[]
+  sponsors              Sponsor[]
+  campaigns             Campaign[]
+  globalSettings        GlobalSettings?
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+// ==========================================
+// LLM CONFIGURATION
+// ==========================================
+
+model LlmConfig {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  apiBaseUrl String
+  apiKey     String   @db.Text
+  modelName  String?
+  isValid    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// FEST PROFILES
+// ==========================================
+
+model FestProfile {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String   // e.g. "Synapse 2025"
+  festType       String?  // e.g. "Technical", "Cultural", "Management"
+  college        String?
+  city           String?
+  theme          String?  @db.Text
+  edition        String?  // e.g. "12th Edition"
+  eventDates     String?  // e.g. "March 15-17, 2025"
+  expectedFootfall Int?
+  socialMediaReach Int?
+  websiteUrl     String?
+  instagramHandle String?
+  linkedinUrl    String?
+  deckUrl        String?
+  // Sponsorship packages stored as JSON array:
+  // [{tier:"Title",amount:"2,00,000",benefits:["logo on banner","stage time",...]}]
+  packages       String?  @db.Text
+  pitchHighlights String? @db.Text // USPs, past sponsors, achievements
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+}
+
+// ==========================================
+// EMAIL ACCOUNTS (SMTP / Gmail)
+// ==========================================
+
+model EmailAccount {
+  id               String             @id @default(cuid())
+  userId           String
+  emailAddress     String
+  displayName      String?
+  provider         EmailProvider      @default(GMAIL)
+  gmailAppPassword String?            @db.Text
+  smtpHost         String?
+  smtpPort         Int?
+  smtpUsername     String?
+  smtpPassword     String?            @db.Text
+  smtpSecure       Boolean            @default(true)
+  dailyLimit       Int                @default(50)
+  sentToday        Int                @default(0)
+  lastResetDate    DateTime           @default(now())
+  status           EmailAccountStatus @default(CONNECTED)
+  lastError        String?
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+  outreaches Outreach[]
+}
+
+enum EmailProvider {
+  GMAIL
+  SMTP
+}
+
+enum EmailAccountStatus {
+  CONNECTED
+  ERROR
+  DISCONNECTED
+}
+
+// ==========================================
+// SPONSORS (Brand contacts)
+// ==========================================
+
+model SponsorList {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries  SponsorListEntry[]
+  campaigns Campaign[]
+}
+
+model Sponsor {
+  id             String   @id @default(cuid())
+  userId         String
+  companyName    String
+  contactEmail   String
+  contactName    String?
+  jobTitle       String?
+  website        String?
+  industry       String?
+  city           String?
+  notes          String?  @db.Text
+  // AI-generated brand research summary
+  aiResearch     String?  @db.Text
+  isVerified     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listEntries SponsorListEntry[]
+  outreaches  Outreach[]
+
+  @@unique([userId, contactEmail])
+  @@index([industry])
+  @@index([companyName])
+}
+
+model SponsorListEntry {
+  id            String @id @default(cuid())
+  sponsorId     String
+  sponsorListId String
+
+  sponsor     Sponsor     @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  sponsorList SponsorList @relation(fields: [sponsorListId], references: [id], onDelete: Cascade)
+
+  @@unique([sponsorId, sponsorListId])
+}
+
+// ==========================================
+// CAMPAIGNS
+// ==========================================
+
+model Campaign {
+  id              String         @id @default(cuid())
+  userId          String
+  name            String
+  festProfileId   String
+  sponsorListId   String
+  emailAccountId  String?
+  status          CampaignStatus @default(DRAFT)
+  // AI pitch generation guidelines
+  guidelines      String?        @db.Text
+  toneOfVoice     String?        // "Professional", "Enthusiastic", "Formal"
+  emailWordLimit  Int            @default(200)
+  subjectTemplate String?
+  // Stats
+  totalSponsors   Int            @default(0)
+  drafted         Int            @default(0)
+  sent            Int            @default(0)
+  replied         Int            @default(0)
+  converted       Int            @default(0)
+  launchedAt      DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  festProfile   FestProfile   @relation(fields: [festProfileId], references: [id])
+  sponsorList   SponsorList   @relation(fields: [sponsorListId], references: [id])
+  emailAccount  EmailAccount? @relation(fields: [emailAccountId], references: [id])
+  outreaches    Outreach[]
+}
+
+enum CampaignStatus {
+  DRAFT
+  GENERATING
+  READY
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+// ==========================================
+// OUTREACH (per-sponsor email pipeline)
+// ==========================================
+
+model Outreach {
+  id             String         @id @default(cuid())
+  campaignId     String
+  sponsorId      String
+  emailAccountId String?
+  // AI-generated content
+  subject        String?
+  body           String?        @db.Text
+  // Pipeline tracking
+  status         OutreachStatus @default(PENDING)
+  replyNotes     String?        @db.Text
+  replyCategory  ReplyCategory?
+  // Sending details
+  sentAt         DateTime?
+  openedAt       DateTime?
+  repliedAt      DateTime?
+  messageId      String?
+  // Generation tracking
+  generatedAt    DateTime?
+  generationError String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  campaign     Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sponsor      Sponsor       @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  emailAccount EmailAccount? @relation(fields: [emailAccountId], references: [id])
+
+  @@unique([campaignId, sponsorId])
+  @@index([campaignId])
+  @@index([status])
+}
+
+enum OutreachStatus {
+  PENDING      // Not generated yet
+  DRAFTED      // AI pitch generated, not sent
+  SENT         // Email sent
+  OPENED       // Opened (if tracking)
+  REPLIED      // Got a reply
+  INTERESTED   // Marked as interested
+  CONVERTED    // Confirmed sponsor!
+  REJECTED     // Declined
+  BOUNCED      // Email bounced
+  FAILED       // Send failed
+}
+
+enum ReplyCategory {
+  INTERESTED
+  NEEDS_MORE_INFO
+  NOT_INTERESTED
+  OUT_OF_OFFICE
+  CONVERTED
+  OTHER
+}
+
+// ==========================================
+// GLOBAL SETTINGS
+// ==========================================
+
+model GlobalSettings {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  dailyEmailLimit  Int      @default(100)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

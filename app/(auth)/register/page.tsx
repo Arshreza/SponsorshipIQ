@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signIn } from "next-auth/react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -30,7 +31,17 @@ export default function RegisterPage() {
         if (!res.ok) {
           setError(data.error || "Registration failed. Please try again.");
         } else {
-          router.push("/login?registered=1");
+          // Auto sign-in the user
+          const loginRes = await signIn("credentials", {
+            email,
+            password,
+            redirect: false,
+          });
+          if (loginRes?.error) {
+            router.push("/login?registered=1");
+          } else {
+            router.push("/dashboard");
+          }
         }
       } else {
         setError(`Database connection failed: Please verify your DATABASE_URL credentials in the .env file.`);

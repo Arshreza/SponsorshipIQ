@@ -64,7 +64,6 @@ export async function POST(req: NextRequest) {
           emailAccountId: emailAccountId || null,
           status: "PENDING",
         })),
-        skipDuplicates: true,
       });
     }
 

@@ -22,11 +22,20 @@ export async function POST(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const { sponsorIds } = await req.json() as { sponsorIds: string[] };
-  if (!sponsorIds?.length) return NextResponse.json({ error: "No sponsor IDs" }, { status: 400 });
-
-  await db.sponsorListEntry.createMany({
-    data: sponsorIds.map((sponsorId) => ({ sponsorId, sponsorListId: id })),
-    skipDuplicates: true,
+  const existing = await db.sponsorListEntry.findMany({
+    where: {
+      sponsorListId: id,
+      sponsorId: { in: sponsorIds },
+    },
+    select: { sponsorId: true },
   });
-  return NextResponse.json({ added: sponsorIds.length });
+  const existingIds = new Set(existing.map((e) => e.sponsorId));
+  const newIds = sponsorIds.filter((sid) => !existingIds.has(sid));
+
+  if (newIds.length > 0) {
+    await db.sponsorListEntry.createMany({
+      data: newIds.map((sponsorId) => ({ sponsorId, sponsorListId: id })),
+    });
+  }
+  return NextResponse.json({ added: newIds.length });
 }

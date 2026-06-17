@@ -17,6 +17,8 @@ npm-debug.log*
 
 # Prisma
 prisma/migrations/
+*.db
+*.db-journal
 
 # OS
 .DS_Store

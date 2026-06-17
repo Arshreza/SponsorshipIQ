@@ -17,19 +17,29 @@ export default function RegisterPage() {
     setError("");
     setLoading(true);
 
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password }),
-    });
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
 
-    const data = await res.json();
-    setLoading(false);
-
-    if (!res.ok) {
-      setError(data.error || "Registration failed. Please try again.");
-    } else {
-      router.push("/login?registered=1");
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "Registration failed. Please try again.");
+        } else {
+          router.push("/login?registered=1");
+        }
+      } else {
+        setError(`Database connection failed: Please verify your DATABASE_URL credentials in the .env file.`);
+      }
+    } catch (err) {
+      console.error("[Register]", err);
+      setError("Failed to reach server. Please make sure the Next.js app is running.");
+    } finally {
+      setLoading(false);
     }
   }
 

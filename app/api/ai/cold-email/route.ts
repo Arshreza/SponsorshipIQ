@@ -15,34 +15,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "GROQ_API_KEY not configured" }, { status: 500 });
   }
 
-  const prompt = `You are an expert sponsorship outreach writer for Indian college fests. Write a ${tone} cold email to secure sponsorship.
+  const prompt = `You are a student from a college fest committee writing a genuine, warm outreach email to a potential sponsor. Your goal is NOT to close a deal — your only goal is to spark interest and get a reply.
 
-SPONSOR DETAILS:
+ABOUT THE COMPANY:
 - Company: ${companyName}
 - Industry: ${industry || "General"}
-- Contact Person: ${contactName}
-- Sponsorship Tier Being Pitched: ${sponsorTier} (₹${tierAmount})
+- Person you're writing to: ${contactName}
 
-FEST DETAILS:
-- Festival Name: ${festName}
+ABOUT YOUR FEST:
+- Festival: ${festName}
 - Theme: ${festTheme || "Innovation & Excellence"}
 - Dates: ${festDate}
-- Expected Footfall: ${expectedFootfall}+
-- Key Highlights: ${highlights}
+- Expected Audience: ${expectedFootfall}+ attendees
+- What makes it special: ${highlights}
 
-Write a complete cold email including:
-1. A compelling subject line (on the first line, prefixed with "Subject: ")
-2. A blank line
-3. The full email body with proper greeting, pitch, value proposition, clear ask, and professional sign-off
+TONE: ${tone}
 
-The email should:
-- Be personalized to ${companyName}'s industry (${industry})
-- Highlight tangible ROI and brand exposure benefits
-- Mention the specific tier (${sponsorTier}) and amount (₹${tierAmount})
-- Be concise but compelling (200-300 words)
-- End with a clear call to action
+STRICT RULES — follow all of these exactly:
+1. Do NOT mention any sponsorship amount, money, pricing, or tiers anywhere in the email. Not even as "investment" or "contribution". Leave all money talk for later conversations.
+2. Do NOT use phrases like "cold email", "outreach email", "I hope this email finds you well", "I am writing to you", "My name is X and I am from Y".
+3. Do NOT open with the fest name or your name. Open with something that feels specific to ${companyName} or their industry — a genuine observation, a shared value, or a compliment that feels human.
+4. Keep it SHORT — max 150 words in the body. Busy people don't read long emails.
+5. The email should sound like it was written by a real student, not a template or AI. No corporate jargon.
+6. End with ONE simple, low-pressure ask — like "Would you be open to a 10-minute call?" or "Can I send you more details?" — not "please sponsor us".
+7. Write a clever, curiosity-inducing subject line that does NOT say "Sponsorship" or "Partnership".
+
+FORMAT:
+Subject: [subject line here]
+
+[email body here]
 
 Write the email now:`;
+
 
   try {
     const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {

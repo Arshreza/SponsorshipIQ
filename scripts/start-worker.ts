@@ -1,3 +1,4 @@
+import "./load-env";
 import { startWorker } from "@/lib/queue/worker";
 
 startWorker();

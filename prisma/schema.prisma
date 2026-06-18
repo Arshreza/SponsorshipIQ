@@ -1,13 +1,12 @@
 // SponsorshipIQ — Database Schema
-// SQLite version for zero-setup local dev / hackathons
+// PostgreSQL + Prisma ORM
 
 generator client {
-  provider   = "prisma-client-js"
-  engineType = "library"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 // ==========================================
@@ -41,12 +40,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -88,7 +87,7 @@ model LlmConfig {
   id         String   @id @default(cuid())
   userId     String   @unique
   apiBaseUrl String
-  apiKey     String
+  apiKey     String   @db.Text
   modelName  String?
   isValid    Boolean  @default(false)
   createdAt  DateTime @default(now())
@@ -108,7 +107,7 @@ model FestProfile {
   festType       String?  // e.g. "Technical", "Cultural", "Management"
   college        String?
   city           String?
-  theme          String?  
+  theme          String?  @db.Text
   edition        String?  // e.g. "12th Edition"
   eventDates     String?  // e.g. "March 15-17, 2025"
   expectedFootfall Int?
@@ -119,8 +118,8 @@ model FestProfile {
   deckUrl        String?
   // Sponsorship packages stored as JSON array:
   // [{tier:"Title",amount:"2,00,000",benefits:["logo on banner","stage time",...]}]
-  packages       String?  
-  pitchHighlights String? 
+  packages       String?  @db.Text
+  pitchHighlights String? @db.Text // USPs, past sponsors, achievements
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -138,17 +137,17 @@ model EmailAccount {
   userId           String
   emailAddress     String
   displayName      String?
-  provider         String             @default("GMAIL") // "GMAIL" | "SMTP"
-  gmailAppPassword String?            
+  provider         EmailProvider      @default(GMAIL)
+  gmailAppPassword String?            @db.Text
   smtpHost         String?
   smtpPort         Int?
   smtpUsername     String?
-  smtpPassword     String?            
+  smtpPassword     String?            @db.Text
   smtpSecure       Boolean            @default(true)
   dailyLimit       Int                @default(50)
   sentToday        Int                @default(0)
   lastResetDate    DateTime           @default(now())
-  status           String             @default("CONNECTED") // "CONNECTED" | "ERROR" | "DISCONNECTED"
+  status           EmailAccountStatus @default(CONNECTED)
   lastError        String?
   isActive         Boolean            @default(true)
   createdAt        DateTime           @default(now())
@@ -157,6 +156,17 @@ model EmailAccount {
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   campaigns Campaign[]
   outreaches Outreach[]
+}
+
+enum EmailProvider {
+  GMAIL
+  SMTP
+}
+
+enum EmailAccountStatus {
+  CONNECTED
+  ERROR
+  DISCONNECTED
 }
 
 // ==========================================
@@ -186,9 +196,9 @@ model Sponsor {
   website        String?
   industry       String?
   city           String?
-  notes          String?  
+  notes          String?  @db.Text
   // AI-generated brand research summary
-  aiResearch     String?  
+  aiResearch     String?  @db.Text
   isVerified     Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -224,9 +234,9 @@ model Campaign {
   festProfileId   String
   sponsorListId   String
   emailAccountId  String?
-  status          String         @default("DRAFT") // "DRAFT" | "GENERATING" | "READY" | "ACTIVE" | "PAUSED" | "COMPLETED"
+  status          CampaignStatus @default(DRAFT)
   // AI pitch generation guidelines
-  guidelines      String?        
+  guidelines      String?        @db.Text
   toneOfVoice     String?        // "Professional", "Enthusiastic", "Formal"
   emailWordLimit  Int            @default(200)
   subjectTemplate String?
@@ -248,6 +258,15 @@ model Campaign {
   outreaches    Outreach[]
 }
 
+enum CampaignStatus {
+  DRAFT
+  GENERATING
+  READY
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
 // ==========================================
 // OUTREACH (per-sponsor email pipeline)
 // ==========================================
@@ -259,11 +278,11 @@ model Outreach {
   emailAccountId String?
   // AI-generated content
   subject        String?
-  body           String?        
+  body           String?        @db.Text
   // Pipeline tracking
-  status         String         @default("PENDING") // "PENDING" | "DRAFTED" | "SENT" | "OPENED" | "REPLIED" | "INTERESTED" | "CONVERTED" | "REJECTED" | "BOUNCED" | "FAILED"
-  replyNotes     String?        
-  replyCategory  String?        // "INTERESTED" | "NEEDS_MORE_INFO" | "NOT_INTERESTED" | "OUT_OF_OFFICE" | "CONVERTED" | "OTHER"
+  status         OutreachStatus @default(PENDING)
+  replyNotes     String?        @db.Text
+  replyCategory  ReplyCategory?
   // Sending details
   sentAt         DateTime?
   openedAt       DateTime?
@@ -282,6 +301,28 @@ model Outreach {
   @@unique([campaignId, sponsorId])
   @@index([campaignId])
   @@index([status])
+}
+
+enum OutreachStatus {
+  PENDING      // Not generated yet
+  DRAFTED      // AI pitch generated, not sent
+  SENT         // Email sent
+  OPENED       // Opened (if tracking)
+  REPLIED      // Got a reply
+  INTERESTED   // Marked as interested
+  CONVERTED    // Confirmed sponsor!
+  REJECTED     // Declined
+  BOUNCED      // Email bounced
+  FAILED       // Send failed
+}
+
+enum ReplyCategory {
+  INTERESTED
+  NEEDS_MORE_INFO
+  NOT_INTERESTED
+  OUT_OF_OFFICE
+  CONVERTED
+  OTHER
 }
 
 // ==========================================

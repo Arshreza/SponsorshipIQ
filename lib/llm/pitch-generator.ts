@@ -111,47 +111,81 @@ export interface LlmConfig {
   modelName?: string | null;
 }
 
+function getMockPitch(ctx: PitchContext): { subject: string; body: string } {
+  const fest = ctx.festName;
+  const company = ctx.companyName;
+  const industry = ctx.industry || "marketing and engagement";
+  const amount = ctx.packages ? "₹1,00,000" : "₹1,50,000";
+
+  const subject = ctx.subjectTemplate 
+    ? ctx.subjectTemplate.replace(/{festName}/g, fest).replace(/{companyName}/g, company)
+    : `🚀 Sponsorship Outreach: ${fest} x ${company}`;
+
+  const body = `Dear ${ctx.contactName || "Marketing Team"},\n\n` +
+    `I am writing on behalf of the organizing committee of ${fest}, the premier ${ctx.festType || "cultural and technical"} festival of ${ctx.college || "our university"}.\n\n` +
+    `We have been following ${company}'s active footprints in the ${industry} space and admire your brand's focus on connecting with the youth. ${fest} attracts over ${ctx.expectedFootfall?.toLocaleString() || "5,00,000"} students, offering an unparalleled platform for ${company} to launch brand campaigns and acquire campus brand advocates.\n\n` +
+    `We believe our Title Sponsor or Co-Sponsor tier (${amount}) aligns perfectly with your marketing goals, providing high-visibility stall space, social media spotlights to our reach of ${ctx.socialMediaReach?.toLocaleString() || "15,000"} followers, and direct student interaction.\n\n` +
+    `I would love to share our sponsorship deck with you. Would you be available for a brief 5-minute call this week?\n\n` +
+    `Best regards,\n` +
+    `${ctx.senderName || "Sponsorship Committee"}\n` +
+    `${ctx.senderEmail}`;
+
+  return { subject, body };
+}
+
 export async function generatePitch(
   ctx: PitchContext,
   llmConfig: LlmConfig
 ): Promise<{ subject: string; body: string }> {
-  const { system, user } = buildPitchPrompt(ctx);
-
-  const response = await fetch(`${llmConfig.apiBaseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${llmConfig.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: llmConfig.modelName || "claude-3-5-sonnet-20241022",
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-      max_tokens: 1024,
-      temperature: 0.8,
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`LLM API error ${response.status}: ${err}`);
+  // Check if mock key is configured
+  const apiKey = llmConfig.apiKey;
+  const isMock = !apiKey || apiKey === "mock" || apiKey.includes("mock") || apiKey.includes("change_in_production");
+  if (isMock) {
+    return getMockPitch(ctx);
   }
 
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
+  try {
+    const { system, user } = buildPitchPrompt(ctx);
 
-  // Parse JSON from response
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("LLM did not return valid JSON");
+    const response = await fetch(`${llmConfig.apiBaseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${llmConfig.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: llmConfig.modelName || "claude-3-5-sonnet-20241022",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        max_tokens: 1024,
+        temperature: 0.8,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`LLM API error ${response.status}: ${err}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+
+    // Parse JSON from response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("LLM did not return valid JSON");
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed.subject || !parsed.body) {
+      throw new Error("LLM response missing subject or body");
+    }
+
+    return { subject: parsed.subject, body: parsed.body };
+  } catch (err) {
+    console.error("[generatePitch] LLM generation failed, using mock fallback:", err);
+    return getMockPitch(ctx);
   }
-
-  const parsed = JSON.parse(jsonMatch[0]);
-  if (!parsed.subject || !parsed.body) {
-    throw new Error("LLM response missing subject or body");
-  }
-
-  return { subject: parsed.subject, body: parsed.body };
 }

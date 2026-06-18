@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { outreachQueue } from "@/lib/queue/queue";
+import { sendEmail } from "@/lib/email/sender";
 
 export async function POST(
   _req: NextRequest,
@@ -43,12 +44,83 @@ export async function POST(
     opts: { delay: 0 },
   }));
 
-  await outreachQueue.addBulk(jobs as any);
+  let isQueuedInRedis = false;
+
+  try {
+    await outreachQueue.addBulk(jobs as any);
+    isQueuedInRedis = true;
+  } catch (err) {
+    console.warn("[Campaign Send API] Redis connection failed, running sync fallback in background:", err);
+    runSendJobsSync(jobs, id);
+  }
 
   await db.campaign.update({
     where: { id },
     data: { status: "ACTIVE" },
   });
 
-  return NextResponse.json({ queued: outreaches.length });
+  return NextResponse.json({ 
+    queued: outreaches.length,
+    message: isQueuedInRedis 
+      ? `Queued ${outreaches.length} email dispatches in Redis.` 
+      : `Queued ${outreaches.length} email dispatches locally (Redis connection bypassed).` 
+  });
+}
+
+// Local Sync Fallback runner to process dispatches without Redis
+async function runSendJobsSync(jobs: any[], campaignId: string) {
+  // Execute in background promise so response returns immediately
+  (async () => {
+    try {
+      console.log(`[Sync Fallback] Starting send for ${jobs.length} jobs...`);
+      for (const job of jobs) {
+        const { outreachId } = job.data;
+
+        const outreach = await db.outreach.findUnique({
+          where: { id: outreachId },
+          include: {
+            sponsor: true,
+            emailAccount: true,
+          },
+        });
+        if (!outreach || !outreach.subject || !outreach.body || !outreach.emailAccount) continue;
+
+        const bodyHtml = outreach.body
+          .split("\n")
+          .map((line) => `<p>${line}</p>`)
+          .join("");
+
+        const info = await sendEmail({
+          account: outreach.emailAccount,
+          to: outreach.sponsor.contactEmail,
+          subject: outreach.subject,
+          html: bodyHtml,
+          text: outreach.body,
+        });
+
+        await db.outreach.update({
+          where: { id: outreachId },
+          data: {
+            status: "SENT",
+            sentAt: new Date(),
+            messageId: info.messageId,
+          },
+        });
+
+        // Update campaign stats
+        await db.campaign.update({
+          where: { id: campaignId },
+          data: { sent: { increment: 1 } },
+        });
+      }
+
+      await db.campaign.update({
+        where: { id: campaignId },
+        data: { status: "ACTIVE" },
+      });
+      console.log("[Sync Fallback] All local sends completed!");
+    } catch (e) {
+      console.error("[Sync Fallback] Error in local job send runner:", e);
+    }
+  })();
 }

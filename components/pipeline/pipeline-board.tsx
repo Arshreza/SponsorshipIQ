@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 const COLUMNS = [
   { id: "PENDING",    label: "Pending",    icon: "⏳", color: "border-slate-500" },
@@ -58,21 +59,34 @@ export function PipelineBoard({ outreaches }: { outreaches: Outreach[] }) {
 
   return (
     <div className="overflow-x-auto pb-4">
-      <div className="flex gap-4 min-w-max">
+      <div className="flex gap-4 min-w-max p-1">
         {COLUMNS.map((col) => (
-          <div key={col.id} className={`w-64 shrink-0`}>
-            <div className={`flex items-center gap-2 px-4 py-2.5 border-b-2 ${col.color} mb-3`}>
+          <div
+            key={col.id}
+            className="w-64 shrink-0 bg-background-secondary/30 border border-border/50 rounded-2xl p-3 flex flex-col min-h-[500px] hover:bg-background-secondary/40 transition-colors"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              const id = e.dataTransfer.getData("text/plain");
+              if (id) updateStatus(id, col.id);
+            }}
+          >
+            <div className={`flex items-center gap-2 px-3 py-2 border-b-2 ${col.color} mb-4`}>
               <span>{col.icon}</span>
               <span className="text-xs font-bold text-foreground uppercase tracking-wider">{col.label}</span>
               <span className="ml-auto text-xs font-bold text-foreground-muted bg-background-tertiary px-2 py-0.5 rounded-full">
                 {grouped[col.id]?.length || 0}
               </span>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-3 flex-1 overflow-y-auto max-h-[600px] pr-1">
               {(grouped[col.id] || []).map((o) => (
                 <div
                   key={o.id}
-                  className="bg-background-secondary border border-border rounded-xl p-4 hover:border-brand-300 transition-all group"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", o.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  className="bg-background-secondary border border-border rounded-xl p-4 hover:border-brand-300 transition-all group cursor-grab active:cursor-grabbing hover:shadow-md hover:scale-[1.02]"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="w-7 h-7 rounded-lg bg-background-tertiary flex items-center justify-center text-xs font-bold text-foreground-secondary shrink-0">
@@ -91,18 +105,29 @@ export function PipelineBoard({ outreaches }: { outreaches: Outreach[] }) {
                   </div>
                   <div className="font-semibold text-sm text-foreground truncate">{o.sponsor.companyName}</div>
                   {o.sponsor.contactName && (
-                    <div className="text-xs text-foreground-muted">{o.sponsor.contactName}</div>
+                    <div className="text-xs text-foreground-muted truncate mt-0.5">{o.sponsor.contactName}</div>
                   )}
                   {o.sponsor.industry && (
                     <span className="inline-block mt-2 text-[10px] bg-background-tertiary border border-border px-2 py-0.5 rounded-full text-foreground-muted">
                       {o.sponsor.industry}
                     </span>
                   )}
-                  <div className="mt-3 pt-3 border-t border-border text-[10px] text-foreground-muted">
-                    {o.campaign.festProfile.name}
+                  <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-[10px] text-foreground-muted">
+                    <span className="truncate max-w-[120px]">{o.campaign.festProfile.name}</span>
+                    <Link
+                      href={`/dashboard/sponsors/${o.id}`}
+                      className="text-brand-600 hover:text-brand-500 font-semibold"
+                    >
+                      View →
+                    </Link>
                   </div>
                 </div>
               ))}
+              {(grouped[col.id] || []).length === 0 && (
+                <div className="text-center py-8 text-[10px] text-foreground-muted border border-dashed border-border/40 rounded-xl flex-1 flex items-center justify-center h-24">
+                  Drag cards here
+                </div>
+              )}
             </div>
           </div>
         ))}

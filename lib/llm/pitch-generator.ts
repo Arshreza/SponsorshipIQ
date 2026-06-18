@@ -189,3 +189,99 @@ export async function generatePitch(
     return getMockPitch(ctx);
   }
 }
+
+export function buildFollowupPrompt(
+  initial: { subject: string; body: string },
+  ctx: PitchContext
+): { system: string; user: string } {
+  const system = `You are a senior sponsorship outreach specialist for college festivals in India.
+You write polite, extremely concise, and warm follow-up reminder emails (drip campaigns).
+
+RULES:
+1. Be extremely brief (under 80 words).
+2. Reference the previous email politely without duplicating the context or packages.
+3. Focus on a soft reminder (e.g. locking in branding layout designs or stall spaces this week).
+4. Keep the subject line as "Re: " followed by the original subject.
+5. Provide a simple, low-friction call to action (a quick call or referral to the right department).
+6. Tone: Friendly, professional, and confident.`;
+
+  const user = `Write a follow-up email for:
+ORIGINAL SUBJECT: ${initial.subject}
+ORIGINAL EMAIL BODY:
+${initial.body}
+
+FESTIVAL: ${ctx.festName}
+SPONSOR COMPANY: ${ctx.companyName}
+SENDER NAME: ${ctx.senderName || "Sponsorship Committee"}
+
+Output JSON with exactly these fields:
+{
+  "subject": "Re: original subject line",
+  "body": "full follow-up email body as plain text with \\n for line breaks"
+}`;
+
+  return { system, user };
+}
+
+function getMockFollowup(initial: { subject: string; body: string }, ctx: PitchContext): { subject: string; body: string } {
+  const subject = initial.subject.startsWith("Re:") ? initial.subject : `Re: ${initial.subject}`;
+  const body = `Hi ${ctx.contactName || "Team"},\n\nI wanted to send a quick follow-up to see if you had a chance to review my previous email about ${ctx.festName}.\n\nWe are currently finalizing the stall placements and concert partner branding layouts. We'd love to explore how we can support ${ctx.companyName}'s youth engagement goals here.\n\nWould you have 5 minutes for a quick touch-base this week, or is there a better person to connect with?\n\nBest regards,\n${ctx.senderName || "Sponsorship Committee"}`;
+  return { subject, body };
+}
+
+export async function generateFollowupPitch(
+  initial: { subject: string; body: string },
+  ctx: PitchContext,
+  llmConfig: LlmConfig
+): Promise<{ subject: string; body: string }> {
+  const apiKey = llmConfig.apiKey;
+  const isMock = !apiKey || apiKey === "mock" || apiKey.includes("mock") || apiKey.includes("change_in_production");
+  if (isMock) {
+    return getMockFollowup(initial, ctx);
+  }
+
+  try {
+    const { system, user } = buildFollowupPrompt(initial, ctx);
+
+    const response = await fetch(`${llmConfig.apiBaseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${llmConfig.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: llmConfig.modelName || "claude-3-5-sonnet-20241022",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        max_tokens: 512,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`LLM API error ${response.status}: ${err}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("LLM did not return valid JSON for follow-up");
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed.subject || !parsed.body) {
+      throw new Error("LLM response missing subject or body for follow-up");
+    }
+
+    return { subject: parsed.subject, body: parsed.body };
+  } catch (err) {
+    console.error("[generateFollowupPitch] LLM generation failed, using mock fallback:", err);
+    return getMockFollowup(initial, ctx);
+  }
+}
+

@@ -6,14 +6,12 @@ import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/dashboard",                icon: "📊", label: "Overview",       exact: true },
-  { href: "/dashboard/fest-profiles",  icon: "🎪", label: "Fest Profiles" },
-  { href: "/dashboard/sponsors",       icon: "🏢", label: "Sponsors" },
-  { href: "/dashboard/sponsor-lists",  icon: "📋", label: "Sponsor Lists" },
-  { href: "/dashboard/campaigns",      icon: "🚀", label: "Campaigns" },
-  { href: "/dashboard/pipeline",       icon: "📊", label: "Pipeline" },
-  { href: "/dashboard/email-accounts", icon: "📬", label: "Email Accounts" },
-  { href: "/dashboard/settings",       icon: "⚙️", label: "Settings" },
+  { href: "/dashboard",                    icon: "📊", label: "Overview",         exact: true },
+  { href: "/dashboard/sponsors",           icon: "🏢", label: "Sponsors",         exact: false },
+  { href: "/dashboard/money",              icon: "💰", label: "Money Tracker",     exact: false },
+  { href: "/dashboard/followups",          icon: "📋", label: "Follow-ups",        exact: false },
+  { href: "/dashboard/ai-email",           icon: "🤖", label: "AI Cold Email",     exact: false },
+  { href: "/dashboard/ai-proposal",        icon: "📄", label: "AI Proposal PDF",   exact: false },
 ];
 
 export function Sidebar() {
@@ -33,13 +31,34 @@ export function Sidebar() {
         </div>
         <div>
           <span className="text-sidebar-fg font-bold text-sm leading-none">SponsorshipIQ</span>
-          <p className="text-sidebar-fg-muted text-[10px] mt-0.5">Sponsorship Intelligence</p>
+          <p className="text-sidebar-fg-muted text-[10px] mt-0.5">AI Club · Fest CRM</p>
         </div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map((item) => (
+        <p className="text-[10px] font-bold text-sidebar-fg-muted uppercase tracking-widest px-3 pb-2">Main</p>
+        {navItems.slice(0, 4).map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
+              isActive(item)
+                ? "bg-brand-600/20 text-brand-300 border border-brand-600/30"
+                : "text-sidebar-fg-muted hover:text-sidebar-fg hover:bg-sidebar-hover"
+            )}
+          >
+            <span className="text-base w-5 text-center shrink-0">{item.icon}</span>
+            <span>{item.label}</span>
+            {isActive(item) && (
+              <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse-soft" />
+            )}
+          </Link>
+        ))}
+
+        <p className="text-[10px] font-bold text-sidebar-fg-muted uppercase tracking-widest px-3 pb-2 pt-4">🤖 AI Features</p>
+        {navItems.slice(4).map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -61,13 +80,6 @@ export function Sidebar() {
 
       {/* Bottom actions */}
       <div className="px-3 py-4 border-t border-sidebar-border space-y-1">
-        <Link
-          href="/dashboard/pipeline/export"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-sidebar-fg-muted hover:text-sidebar-fg hover:bg-sidebar-hover transition-all"
-        >
-          <span className="text-base w-5 text-center">🔄</span>
-          <span>Handover Export</span>
-        </Link>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-sidebar-fg-muted hover:text-red-400 hover:bg-red-500/10 transition-all"

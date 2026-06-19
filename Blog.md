@@ -1,58 +1,67 @@
-# The Story of SponsorshipIQ: Solving the College Festival "Contact Reset" Problem 🎪🚀
+# SponsorshipIQ: Solving the College-Fest "Contact Reset"
 
-It’s 2:00 AM on a Tuesday. Aarav, the Public Relations lead for a major university tech fest, is staring at a monitor illuminated by three windows: a chaotic Excel spreadsheet of 180 "potential sponsors," a generic Gmail template asking for "sponsorship support," and a PDF of the festival's pitch deck. 
+Every student-run festival hits the same wall. The PR lead spends nights copy-pasting company names into a generic "please sponsor us" email, sends a few dozen, watches most land in spam — and then graduates. The spreadsheet of contacts and every reply lives in one person's inbox, and next year's lead starts from absolute zero.
 
-He’s already sent 45 emails tonight, manually copy-pasting the company names, names of the marketing managers, and event dates. He knows that 90% of these will end up in spam, and by next semester when he graduates, this entire spreadsheet and the replies he receives will be lost in his personal inbox. The next year's PR lead will start from absolute zero.
-
-This is the **"annual contact reset"**—a painful cycle that plagues every student-run event in the world. And it’s exactly why we built **SponsorshipIQ**.
+I call this the **annual contact reset**, and it's the problem SponsorshipIQ is built to kill.
 
 ---
 
-## 💡 The Spark of the Idea
+## Where the idea came from
 
-College festival committees raise millions in sponsorship funding globally, yet their tools are stuck in the early 2000s. We realized that solving this required three core pillars:
-1. **A Persistent Legacy Database**: A CRM that doesn't delete itself when the current coordinators graduate.
-2. **Personalized, Safe AI Outreach**: AI that doesn't just spam, but actually *researches* the sponsor and writes a highly personalized pitch tailored to that brand's industry, without sounding like a generic template.
-3. **Strict Outreach Guardrails**: In college sponsorships, cold emails should never mention financial numbers or pitch packages upfront—that's a quick way to get rejected. The email must strictly be designed to **book a meeting**, leaving negotiations for when the brand replies.
+The approach isn't a blind guess. Before this, I'd built **ColdPegion** — a B2B cold-outreach engine that proved the core thesis: validated contact lists + AI-personalized pitches + authorized mailbox sending outperforms manual mass email. ColdPegion showed the outreach loop works; SponsorshipIQ takes that proven idea and rebuilds it from the ground up for the *fest sponsorship* audience — a committee instead of a sales team, brands instead of B2B prospects, and a CRM that survives the yearly handover.
 
----
-
-## 🛠️ The Technical Journey: How We Built It
-
-During this hackathon, we set out to build SponsorshipIQ from scratch using **Next.js 15 (App Router)**, **Tailwind CSS v4**, and **Prisma with PostgreSQL**.
-
-Here is how the architecture came together:
-
-### 1. The Unified CRM & Legacy Board
-We designed a pipeline board where student coordinators can import contacts from a CSV file. The columns auto-map to the database, instantly creating a structured profile for every brand. The status board lets the team drag sponsors from *Contacted* to *Interested* to *Converted*, and log negotiator notes.
-
-### 2. Direct Google OAuth & Gmail Integration
-Using standard SMTP credentials or API keys in production can be complex and insecure. We wanted students to be able to sign in securely with their Google Workspace account and authorize Gmail sending. 
-We built a custom OAuth flow requesting the Google `gmail.send` scope. Using Node's cryptographic libraries, the app encrypts the refresh token using an `ENCRYPTION_MASTER_KEY` and securely saves it. When the outreach engine runs, it uses the authorized tokens to send the email directly from the coordinator's mailbox.
-
-### 3. The Autonomous LLaMA 3.1 Outreach Engine
-For a background worker, running Redis locally can sometimes be a hurdle for developers. To solve this, we implemented a simple Next.js Cron endpoint `/api/cron/process-outreach`.
-When triggered, it grabs active campaigns, fetches the sponsor details and fest profile, and makes an API call to **Groq AI (LLaMA 3.1)**. 
-We engineered a strict prompt constraint system: the LLM is hardcoded to *never* mention tiers or prices, strictly focusing on the festival's value proposition (e.g. developer reach, footfall) and requesting a short calendar booking.
-
-### 4. Live Money & Target Tracker
-We added a target configuration feature. In the **Money Tracker** dashboard, coordinators can edit the fest's target sponsorship goal, log GST (18%) collections, and track exactly how close they are to funding their dream event.
+> Note for any public writeup: frame ColdPegion as the predecessor that *inspired* this build, not as code you reused — SponsorshipIQ is a fresh Next.js stack, so "reused modules" would be inaccurate.
 
 ---
 
-## 🚧 Overcoming the Final Hurdles
+## What SponsorshipIQ does
 
-No hackathon project is complete without late-night debugging. During deployment on **Vercel**, we hit a critical security advisory blocker: the system flagged a vulnerability in our Next.js version (`15.3.3`). 
-We immediately updated our dependencies to the patched, secure version **`15.4.8`**, resolved compiling warnings by optimizing our CSS `@import` ordering, set up a serverless **Neon PostgreSQL** database in a single click, and successfully pushed the schema migrations. 
+**1. A persistent legacy CRM — never start from zero.**
+Coordinators import brands from a CSV with custom column mapping (company, email, website, industry); every sponsor gets a structured profile. An interactive Kanban board moves brands through *Drafted → Sent → Replied → Converted* with negotiator notes attached — and the pipeline survives graduation instead of dying in one person's inbox.
 
-The build compiled successfully, and SponsorshipIQ went live.
+**2. Context-aware AI pitches.**
+The generation engine injects the festival's details (theme, footfall, package tiers) and the target sponsor's profile to produce a personalized subject line and email, tailored to that brand's industry — not a generic template.
+
+**3. Secure Gmail authorization.**
+Coordinators authorize the `gmail.send` scope via Google OAuth2; the refresh token is encrypted before storage, and outreach is sent from the coordinator's own mailbox.
+
+**4. Target tracking & money ledger.**
+Set a sponsorship goal, log paid and pending funds (including GST at 18%), and watch real-time progress toward funding the event.
 
 ---
 
-## 🔮 What’s Next?
+## Tech Stack
 
-SponsorshipIQ is just getting started. Our vision is to build:
-* **AI Auto-Reply Parsing**: Automatically read incoming emails and sort them on the Kanban board.
-* **Smart Follow-ups**: Schedule automated follow-up sequences if a sponsor doesn’t reply in 3 days.
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 15 (App Router), React 19, Tailwind CSS v4 |
+| Backend / API | Next.js Server Actions & Route Handlers (Node.js) |
+| Database | PostgreSQL via Prisma ORM |
+| Auth | NextAuth.js v5 (Credentials) for app login; Google OAuth2 for Gmail authorization |
+| Integrations | Google APIs — Gmail send + OAuth2 |
+| AI layer | Groq (LLaMA 3.1) for pitch generation |
 
-By replacing the manual grind with autonomous, personalized AI workflows, SponsorshipIQ ensures student organizers can spend less time typing emails, and more time creating unforgettable experiences. 🎪🚀
+> **Confirm before publishing:** (a) If the Anthropic Claude SDK is actually wired in, add it back here *and* add `ANTHROPIC_API_KEY` to `.env.example`; if not, leave it out. (b) State a single email path — Gmail API, or Nodemailer with OAuth2 transport — not both. (c) Verify the exact Next.js / Prisma version labels are real.
+
+---
+
+## Implemented
+
+- User auth (NextAuth credentials, hashed passwords, sessions)
+- Fest profiles CRUD with a package-tier builder
+- Sponsor CRM with CSV import + column mapping
+- Email campaigns (active / paused / draft) with linked sender accounts
+- Google OAuth for Gmail (`gmail.send`), encrypted refresh tokens
+- Sponsorship target + money tracker with GST ledger
+- AI generation engine (dynamic prompt injection)
+- Pipeline Kanban with status tracking and notes
+
+---
+
+## What's next
+
+- **Auto-reply parsing** — read incoming replies and sort them onto the board automatically.
+- **Smart follow-ups** — schedule a follow-up if a sponsor goes quiet for a few days.
+- **Lead suggestions** — surface brands that have sponsored similar fests.
+
+The one-liner: SponsorshipIQ turns the yearly sponsorship grind into a personalized, trackable pipeline that the *next* committee inherits instead of rebuilding.

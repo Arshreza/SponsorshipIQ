@@ -15,6 +15,7 @@ interface Campaign {
   converted: number;
   launchedAt: string | null;
   createdAt: string;
+  emailAccountId?: string | null;
 }
 
 const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
@@ -28,6 +29,7 @@ const statusConfig: Record<string, { label: string; color: string; dot: string }
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [emailAccounts, setEmailAccounts] = useState<{ id: string; emailAddress: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [actioningId, setActioningId] = useState<string | null>(null);
 
@@ -48,9 +50,22 @@ export default function CampaignsPage() {
     }
   }, []);
 
+  const loadEmails = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings/email");
+      if (res.ok) {
+        const data = await res.json();
+        setEmailAccounts(data.filter((a: any) => a.status === "CONNECTED"));
+      }
+    } catch {
+      // quiet fallback
+    }
+  }, []);
+
   useEffect(() => {
     loadCampaigns();
-  }, [loadCampaigns]);
+    loadEmails();
+  }, [loadCampaigns, loadEmails]);
 
   async function handleAction(id: string, action: "start" | "pause") {
     setActioningId(id);
@@ -72,6 +87,25 @@ export default function CampaignsPage() {
       toast.error("Network error executing action");
     } finally {
       setActioningId(null);
+    }
+  }
+
+  async function handleAssignEmail(campaignId: string, emailAccountId: string) {
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailAccountId: emailAccountId || null }),
+      });
+      if (res.ok) {
+        toast.success("Email sender updated successfully! 📧");
+        setCampaigns(campaigns.map(c => c.id === campaignId ? { ...c, emailAccountId } : c));
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to update email account");
+      }
+    } catch {
+      toast.error("Network error updating email account");
     }
   }
 
@@ -131,6 +165,30 @@ export default function CampaignsPage() {
                       <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
                       {sc.label}
                     </span>
+                  </div>
+
+                  {/* Sender Account Selector */}
+                  <div className="mb-4">
+                    <label className="block text-[11px] font-bold text-foreground-muted uppercase tracking-wider mb-1">
+                      Sender Email Account
+                    </label>
+                    {emailAccounts.length === 0 ? (
+                      <div className="text-xs text-amber-400">
+                        No connected emails. <Link href="/dashboard/settings/email" className="text-brand-400 hover:underline font-bold">Connect one →</Link>
+                      </div>
+                    ) : (
+                      <select
+                        value={c.emailAccountId || ""}
+                        onChange={(e) => handleAssignEmail(c.id, e.target.value)}
+                        disabled={c.status === "ACTIVE" || c.status === "COMPLETED"}
+                        className="w-full bg-background border border-border/80 text-foreground rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-500/50 transition-all disabled:opacity-75 disabled:cursor-not-allowed"
+                      >
+                        <option value="">-- No sender linked (Drafts only) --</option>
+                        {emailAccounts.map(a => (
+                          <option key={a.id} value={a.id}>{a.emailAddress}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
                   {/* Stats Grid */}

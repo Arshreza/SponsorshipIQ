@@ -81,45 +81,43 @@ const createMockPrismaClient = () => {
         };
       }
 
+      function matchItem(item: any, whereClause: any): boolean {
+        if (!whereClause) return true;
+        for (const [key, val] of Object.entries(whereClause)) {
+          if (val && typeof val === "object" && !Array.isArray(val)) {
+            if ("in" in val) {
+              if (!Array.isArray(val.in) || !val.in.includes(item[key])) return false;
+            } else {
+              // Handle compound unique keys or nested where clauses
+              for (const [subKey, subVal] of Object.entries(val)) {
+                if (item[subKey] !== subVal) return false;
+              }
+            }
+          } else {
+            if (item[key] !== val) return false;
+          }
+        }
+        return true;
+      }
+
       return {
         findMany: (args?: any) => {
           let list = mockStore[modelName] || [];
           if (args?.where) {
-            list = list.filter(item => {
-              for (const [key, val] of Object.entries(args.where)) {
-                if (val && typeof val === "object" && "in" in val) {
-                  if (!(val.in as any[]).includes(item[key])) return false;
-                } else if (val && typeof val === "object") {
-                  // Skip complex
-                } else if (item[key] !== val) {
-                  return false;
-                }
-              }
-              return true;
-            });
+            list = list.filter(item => matchItem(item, args.where));
           }
           const enriched = list.map(item => attachRelations(modelName, item));
           return Promise.resolve(JSON.parse(JSON.stringify(enriched)));
         },
         findUnique: (args: any) => {
           const list = mockStore[modelName] || [];
-          const item = list.find(item => {
-            for (const [key, val] of Object.entries(args.where)) {
-              if (item[key] === val) return true;
-            }
-            return false;
-          });
+          const item = list.find(item => matchItem(item, args.where));
           return Promise.resolve(item ? JSON.parse(JSON.stringify(attachRelations(modelName, item))) : null);
         },
         findFirst: (args?: any) => {
           let list = mockStore[modelName] || [];
           if (args?.where) {
-            list = list.filter(item => {
-              for (const [key, val] of Object.entries(args.where)) {
-                if (item[key] !== val) return false;
-              }
-              return true;
-            });
+            list = list.filter(item => matchItem(item, args.where));
           }
           return Promise.resolve(list[0] ? JSON.parse(JSON.stringify(attachRelations(modelName, list[0]))) : null);
         },
@@ -132,12 +130,7 @@ const createMockPrismaClient = () => {
         },
         update: (args: any) => {
           const list = mockStore[modelName] || [];
-          const idx = list.findIndex(item => {
-            for (const [key, val] of Object.entries(args.where)) {
-              if (item[key] === val) return true;
-            }
-            return false;
-          });
+          const idx = list.findIndex(item => matchItem(item, args.where));
           if (idx !== -1) {
             list[idx] = { ...list[idx], ...args.data };
             mockStore[modelName] = list;
@@ -145,14 +138,23 @@ const createMockPrismaClient = () => {
           }
           return Promise.resolve(null);
         },
+        upsert: (args: any) => {
+          const list = mockStore[modelName] || [];
+          const idx = list.findIndex(item => matchItem(item, args.where));
+          if (idx !== -1) {
+            list[idx] = { ...list[idx], ...args.update };
+            mockStore[modelName] = list;
+            return Promise.resolve(JSON.parse(JSON.stringify(attachRelations(modelName, list[idx]))));
+          } else {
+            const newItem = { id: `mock-${modelName}-${Date.now()}`, ...args.create };
+            list.push(newItem);
+            mockStore[modelName] = list;
+            return Promise.resolve(JSON.parse(JSON.stringify(attachRelations(modelName, newItem))));
+          }
+        },
         delete: (args: any) => {
           const list = mockStore[modelName] || [];
-          const idx = list.findIndex(item => {
-            for (const [key, val] of Object.entries(args.where)) {
-              if (item[key] === val) return true;
-            }
-            return false;
-          });
+          const idx = list.findIndex(item => matchItem(item, args.where));
           if (idx !== -1) {
             const removed = list.splice(idx, 1)[0];
             mockStore[modelName] = list;
@@ -161,7 +163,10 @@ const createMockPrismaClient = () => {
           return Promise.resolve(null);
         },
         count: (args?: any) => {
-          const list = mockStore[modelName] || [];
+          let list = mockStore[modelName] || [];
+          if (args?.where) {
+            list = list.filter(item => matchItem(item, args.where));
+          }
           return Promise.resolve(list.length);
         }
       };

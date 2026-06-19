@@ -196,7 +196,13 @@ model Sponsor {
   website        String?
   industry       String?
   city           String?
+  phone          String?
   notes          String?  @db.Text
+  // CRM pipeline tracking
+  status         String   @default("CONTACTED") // CONTACTED, INTERESTED, CONFIRMED, REJECTED
+  amount         Int      @default(0)
+  assignedTo     String?
+  lastContact    String?  // ISO date string YYYY-MM-DD
   // AI-generated brand research summary
   aiResearch     String?  @db.Text
   isVerified     Boolean  @default(false)
@@ -333,6 +339,8 @@ model GlobalSettings {
   id               String   @id @default(cuid())
   userId           String   @unique
   dailyEmailLimit  Int      @default(100)
+  followupsData    String?  @db.Text // JSON array of FollowUp objects
+  paymentsData     String?  @db.Text // JSON array of Payment objects
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

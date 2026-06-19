@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
 const MEMBERS = ["Priya", "Raj", "Meera", "Arjun", "Divya", "Siddharth"];
@@ -29,13 +29,6 @@ interface FollowUp {
   notes: string;
 }
 
-const INITIAL: FollowUp[] = [
-  { id: "1", company: "HDFC Bank",     contact: "Suresh Nair",  assignedTo: "Meera", lastContact: "2025-06-08", nextAction: "Call / WhatsApp",      nextDate: "2025-06-20", status: "CONTACTED",  priority: "HIGH",   notes: "Marketing head not available. Try again Monday morning." },
-  { id: "2", company: "Zomato",        contact: "Ananya Patel", assignedTo: "Raj",   lastContact: "2025-06-12", nextAction: "Send proposal PDF",     nextDate: "2025-06-18", status: "INTERESTED", priority: "HIGH",   notes: "Loves stall concept. Send them the full proposal today." },
-  { id: "3", company: "Amul",          contact: "Girish Dave",  assignedTo: "Priya", lastContact: "2025-06-14", nextAction: "Follow up on proposal", nextDate: "2025-06-21", status: "CONTACTED",  priority: "MEDIUM", notes: "Proposal sent. Waiting for their internal approval." },
-  { id: "4", company: "Jio Platforms", contact: "Neha Kapoor",  assignedTo: "Raj",   lastContact: "2025-06-15", nextAction: "Schedule meeting",      nextDate: "2025-06-19", status: "INTERESTED", priority: "HIGH",   notes: "Very interested. Set up a face-to-face call ASAP." },
-];
-
 const PRIORITY_CONFIG = {
   HIGH:   { color: "bg-red-500/15 text-red-400 border-red-500/30",    dot: "bg-red-400" },
   MEDIUM: { color: "bg-amber-500/15 text-amber-400 border-amber-500/30", dot: "bg-amber-400" },
@@ -43,12 +36,49 @@ const PRIORITY_CONFIG = {
 };
 
 export default function FollowupsPage() {
-  const [items, setItems] = useState<FollowUp[]>(INITIAL);
+  const [items, setItems] = useState<FollowUp[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<FollowUp>>({});
   const [filterMember, setFilterMember] = useState("ALL");
   const [filterPriority, setFilterPriority] = useState("ALL");
+
+  const loadFollowups = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/followups");
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data);
+      } else {
+        toast.error("Failed to load follow-ups");
+      }
+    } catch {
+      toast.error("Network error loading follow-ups");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadFollowups(); }, [loadFollowups]);
+
+  async function persistItems(newItems: FollowUp[]) {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/followups", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newItems),
+      });
+      if (!res.ok) toast.error("Failed to save changes");
+    } catch {
+      toast.error("Network error saving follow-ups");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const filtered = items.filter(i => {
     const m = filterMember === "ALL" || i.assignedTo === filterMember;
@@ -63,21 +93,27 @@ export default function FollowupsPage() {
   function openEdit(item: FollowUp) { setForm({ ...item }); setEditId(item.id); setShowAdd(true); }
   function closeModal() { setShowAdd(false); setEditId(null); setForm({}); }
 
-  function save() {
+  async function save() {
     if (!form.company || !form.contact) { toast.error("Company and contact are required"); return; }
+    let newItems: FollowUp[];
     if (editId) {
-      setItems(prev => prev.map(i => i.id === editId ? { ...i, ...form } as FollowUp : i));
+      newItems = items.map(i => i.id === editId ? { ...i, ...form } as FollowUp : i);
       toast.success("Follow-up updated!");
     } else {
-      setItems(prev => [{ ...form, id: Date.now().toString() } as FollowUp, ...prev]);
+      const newItem = { ...form, id: Date.now().toString() } as FollowUp;
+      newItems = [newItem, ...items];
       toast.success("Follow-up added!");
     }
+    setItems(newItems);
     closeModal();
+    await persistItems(newItems);
   }
 
-  function markDone(id: string) {
-    setItems(prev => prev.filter(i => i.id !== id));
+  async function markDone(id: string) {
+    const newItems = items.filter(i => i.id !== id);
+    setItems(newItems);
     toast.success("Marked done! 🎉");
+    await persistItems(newItems);
   }
 
   const inputClass = "w-full bg-background border border-border text-foreground placeholder-foreground-muted rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-400 transition-all";
@@ -91,7 +127,8 @@ export default function FollowupsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">📋 Follow-up Tracker</h1>
           <p className="text-foreground-muted text-sm mt-1">
-            {items.length} active follow-ups · {items.filter(i => i.nextDate <= today).length} due today or overdue
+            {loading ? "Loading…" : `${items.length} active follow-ups · ${items.filter(i => i.nextDate <= today).length} due today or overdue`}
+            {saving && <span className="ml-2 text-brand-400 animate-pulse">· Saving…</span>}
           </p>
         </div>
         <button
@@ -127,77 +164,88 @@ export default function FollowupsPage() {
         ))}
       </div>
 
+      {/* Loading */}
+      {loading && (
+        <div className="bg-background-secondary border border-border rounded-2xl p-8 text-center">
+          <div className="w-8 h-8 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-foreground-muted text-sm">Loading follow-ups…</p>
+        </div>
+      )}
+
       {/* Cards Grid */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {filtered.length === 0 && (
-          <div className="col-span-2 text-center py-12 text-foreground-muted">
-            No follow-ups found. <button onClick={openAdd} className="text-brand-400 hover:underline font-semibold">Add one →</button>
-          </div>
-        )}
-        {filtered.map(item => {
-          const pc = PRIORITY_CONFIG[item.priority];
-          const isOverdue = item.nextDate < today;
-          const isDueToday = item.nextDate === today;
-          return (
-            <div
-              key={item.id}
-              className={`bg-background-secondary border rounded-2xl p-5 spotlight-card transition-all ${
-                isOverdue ? "border-red-500/40" : isDueToday ? "border-amber-500/40" : "border-border hover:border-brand-500/30"
-              }`}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-bold text-foreground">{item.company}</h3>
-                  <p className="text-xs text-foreground-muted">{item.contact}</p>
-                </div>
-                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${pc.color}`}>
-                  {item.priority}
-                </span>
-              </div>
-
-              <div className="space-y-2 text-xs text-foreground-muted mb-4">
-                <div className="flex items-center gap-2">
-                  <span>👤</span>
-                  <span>Assigned to <strong className="text-foreground">{item.assignedTo}</strong></span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>📅</span>
-                  <span>Last contact: {item.lastContact}</span>
-                </div>
-                <div className={`flex items-center gap-2 font-semibold ${isOverdue ? "text-red-400" : isDueToday ? "text-amber-400" : "text-foreground-muted"}`}>
-                  <span>{isOverdue ? "🚨" : isDueToday ? "⚠️" : "🗓️"}</span>
-                  <span>Next: {item.nextDate} {isOverdue ? "(OVERDUE)" : isDueToday ? "(TODAY)" : ""}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span>⚡</span>
-                  <span className="text-brand-400 font-semibold">{item.nextAction}</span>
-                </div>
-              </div>
-
-              {item.notes && (
-                <p className="text-xs text-foreground-muted bg-background rounded-xl px-3 py-2 mb-4 italic">
-                  "{item.notes}"
-                </p>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => openEdit(item)}
-                  className="flex-1 text-xs text-brand-400 font-semibold py-2 rounded-xl border border-brand-500/30 hover:bg-brand-500/10 transition-all"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => markDone(item.id)}
-                  className="flex-1 text-xs text-green-400 font-semibold py-2 rounded-xl border border-green-500/30 hover:bg-green-500/10 transition-all"
-                >
-                  ✓ Done
-                </button>
-              </div>
+      {!loading && (
+        <div className="grid md:grid-cols-2 gap-4">
+          {filtered.length === 0 && (
+            <div className="col-span-2 text-center py-12 text-foreground-muted">
+              {items.length === 0 ? "No follow-ups yet." : "No follow-ups match your filter."}{" "}
+              <button onClick={openAdd} className="text-brand-400 hover:underline font-semibold">Add one →</button>
             </div>
-          );
-        })}
-      </div>
+          )}
+          {filtered.map(item => {
+            const pc = PRIORITY_CONFIG[item.priority];
+            const isOverdue = item.nextDate < today;
+            const isDueToday = item.nextDate === today;
+            return (
+              <div
+                key={item.id}
+                className={`bg-background-secondary border rounded-2xl p-5 spotlight-card transition-all ${
+                  isOverdue ? "border-red-500/40" : isDueToday ? "border-amber-500/40" : "border-border hover:border-brand-500/30"
+                }`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 className="font-bold text-foreground">{item.company}</h3>
+                    <p className="text-xs text-foreground-muted">{item.contact}</p>
+                  </div>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${pc.color}`}>
+                    {item.priority}
+                  </span>
+                </div>
+
+                <div className="space-y-2 text-xs text-foreground-muted mb-4">
+                  <div className="flex items-center gap-2">
+                    <span>👤</span>
+                    <span>Assigned to <strong className="text-foreground">{item.assignedTo}</strong></span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>📅</span>
+                    <span>Last contact: {item.lastContact}</span>
+                  </div>
+                  <div className={`flex items-center gap-2 font-semibold ${isOverdue ? "text-red-400" : isDueToday ? "text-amber-400" : "text-foreground-muted"}`}>
+                    <span>{isOverdue ? "🚨" : isDueToday ? "⚠️" : "🗓️"}</span>
+                    <span>Next: {item.nextDate} {isOverdue ? "(OVERDUE)" : isDueToday ? "(TODAY)" : ""}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>⚡</span>
+                    <span className="text-brand-400 font-semibold">{item.nextAction}</span>
+                  </div>
+                </div>
+
+                {item.notes && (
+                  <p className="text-xs text-foreground-muted bg-background rounded-xl px-3 py-2 mb-4 italic">
+                    &quot;{item.notes}&quot;
+                  </p>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openEdit(item)}
+                    className="flex-1 text-xs text-brand-400 font-semibold py-2 rounded-xl border border-brand-500/30 hover:bg-brand-500/10 transition-all"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => markDone(item.id)}
+                    className="flex-1 text-xs text-green-400 font-semibold py-2 rounded-xl border border-green-500/30 hover:bg-green-500/10 transition-all"
+                  >
+                    ✓ Done
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal */}
       {showAdd && (

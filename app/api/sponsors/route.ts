@@ -19,7 +19,21 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { companyName, contactEmail, contactName, jobTitle, website, industry, city, notes } = body;
+    const {
+      companyName,
+      contactEmail,
+      contactName,
+      jobTitle,
+      website,
+      industry,
+      city,
+      phone,
+      notes,
+      status,
+      amount,
+      assignedTo,
+      lastContact,
+    } = body;
 
     if (!companyName || !contactEmail) {
       return NextResponse.json({ error: "companyName and contactEmail are required" }, { status: 400 });
@@ -27,8 +41,36 @@ export async function POST(req: NextRequest) {
 
     const sponsor = await db.sponsor.upsert({
       where: { userId_contactEmail: { userId: session.user.id, contactEmail } },
-      create: { userId: session.user.id, companyName, contactEmail, contactName, jobTitle, website, industry, city, notes },
-      update: { companyName, contactName, jobTitle, website, industry, city, notes },
+      create: {
+        userId: session.user.id,
+        companyName,
+        contactEmail,
+        contactName,
+        jobTitle,
+        website,
+        industry,
+        city,
+        phone,
+        notes,
+        status: status || "CONTACTED",
+        amount: amount || 0,
+        assignedTo,
+        lastContact,
+      },
+      update: {
+        companyName,
+        contactName,
+        jobTitle,
+        website,
+        industry,
+        city,
+        phone,
+        notes,
+        status,
+        amount,
+        assignedTo,
+        lastContact,
+      },
     });
 
     return NextResponse.json(sponsor, { status: 201 });

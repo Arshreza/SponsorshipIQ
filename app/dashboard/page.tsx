@@ -1,15 +1,6 @@
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 import Link from "next/link";
-
-// Mock data — no DB needed
-const mockSponsors = [
-  { id: "1", company: "TechCorp India", contact: "Ravi Sharma", email: "ravi@techcorp.in", phone: "9876543210", industry: "Technology", status: "CONFIRMED", amount: 150000, assignedTo: "Priya", lastContact: "2025-06-10" },
-  { id: "2", company: "Zomato", contact: "Ananya Patel", email: "ananya@zomato.com", phone: "9123456789", industry: "Food Tech", status: "INTERESTED", amount: 75000, assignedTo: "Raj", lastContact: "2025-06-12" },
-  { id: "3", company: "HDFC Bank", contact: "Suresh Nair", email: "suresh@hdfc.com", phone: "9988776655", industry: "Banking", status: "CONTACTED", amount: 200000, assignedTo: "Meera", lastContact: "2025-06-08" },
-  { id: "4", company: "Amul", contact: "Girish Dave", email: "girish@amul.coop", phone: "9765432100", industry: "FMCG", status: "CONTACTED", amount: 50000, assignedTo: "Priya", lastContact: "2025-06-14" },
-  { id: "5", company: "Jio Platforms", contact: "Neha Kapoor", email: "neha@jio.com", phone: "9900112233", industry: "Telecom", status: "INTERESTED", amount: 100000, assignedTo: "Raj", lastContact: "2025-06-15" },
-  { id: "6", company: "Myntra", contact: "Kiran Bhat", email: "kiran@myntra.com", phone: "9456789012", industry: "E-Commerce", status: "REJECTED", amount: 0, assignedTo: "Meera", lastContact: "2025-06-05" },
-];
 
 const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
   CONFIRMED:  { label: "Confirmed",  color: "bg-green-500/15 text-green-400 border-green-500/30",  dot: "bg-green-400" },
@@ -22,20 +13,48 @@ export default async function DashboardPage() {
   const session = await auth();
   if (!session) return null;
 
-  const confirmed   = mockSponsors.filter(s => s.status === "CONFIRMED");
-  const interested  = mockSponsors.filter(s => s.status === "INTERESTED");
-  const contacted   = mockSponsors.filter(s => s.status === "CONTACTED");
-  const totalRaised = confirmed.reduce((sum, s) => sum + s.amount, 0);
-  const target      = 750000;
-  const progress    = Math.min(Math.round((totalRaised / target) * 100), 100);
+  // Fetch real data from DB
+  const [sponsors, globalSettings] = await Promise.all([
+    db.sponsor.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "desc" },
+    }),
+    db.globalSettings.findFirst({
+      where: { userId: session.user.id },
+    }),
+  ]);
+
+  const confirmed   = sponsors.filter(s => s.status === "CONFIRMED");
+  const interested  = sponsors.filter(s => s.status === "INTERESTED");
+  const contacted   = sponsors.filter(s => s.status === "CONTACTED");
+
+  // Pull real payment totals from stored money data
+  let totalRaised = 0;
+  try {
+    const raw = (globalSettings as any)?.paymentsData;
+    if (raw) {
+      const payments = JSON.parse(raw) as Array<{ status: string; amount: number }>;
+      totalRaised = payments
+        .filter(p => p.status === "PAID")
+        .reduce((sum, p) => sum + p.amount, 0);
+    } else {
+      // Fallback: sum confirmed sponsor amounts
+      totalRaised = confirmed.reduce((sum, s) => sum + s.amount, 0);
+    }
+  } catch {
+    totalRaised = confirmed.reduce((sum, s) => sum + s.amount, 0);
+  }
+
+  const target   = 750000;
+  const progress = Math.min(Math.round((totalRaised / target) * 100), 100);
 
   const stats = [
-    { label: "Total Sponsors",    value: mockSponsors.length, icon: "🏢", color: "text-brand-400" },
-    { label: "Confirmed",         value: confirmed.length,    icon: "✅", color: "text-green-400" },
-    { label: "Interested",        value: interested.length,   icon: "🔥", color: "text-blue-400" },
-    { label: "In Follow-up",      value: contacted.length,    icon: "📞", color: "text-amber-400" },
-    { label: "Funds Raised",      value: `₹${(totalRaised/1000).toFixed(0)}K`, icon: "💰", color: "text-purple-400" },
-    { label: "Target Progress",   value: `${progress}%`,      icon: "🎯", color: "text-pink-400" },
+    { label: "Total Sponsors",  value: sponsors.length,    icon: "🏢", color: "text-brand-400" },
+    { label: "Confirmed",       value: confirmed.length,   icon: "✅", color: "text-green-400" },
+    { label: "Interested",      value: interested.length,  icon: "🔥", color: "text-blue-400" },
+    { label: "In Follow-up",    value: contacted.length,   icon: "📞", color: "text-amber-400" },
+    { label: "Funds Raised",    value: `₹${(totalRaised/1000).toFixed(0)}K`, icon: "💰", color: "text-purple-400" },
+    { label: "Target Progress", value: `${progress}%`,     icon: "🎯", color: "text-pink-400" },
   ];
 
   const quickActions = [
@@ -44,6 +63,9 @@ export default async function DashboardPage() {
     { label: "AI Proposal PDF",  href: "/dashboard/ai-proposal",  icon: "📄", desc: "Full brochure in one click" },
     { label: "Money Tracker",    href: "/dashboard/money",        icon: "💰", desc: "See confirmed amounts" },
   ];
+
+  // Recent 5 sponsors
+  const recentSponsors = sponsors.slice(0, 5);
 
   return (
     <div className="space-y-8">
@@ -85,13 +107,15 @@ export default async function DashboardPage() {
         <div className="w-full bg-background rounded-full h-4 overflow-hidden">
           <div
             className="h-full gradient-brand rounded-full transition-all duration-700 flex items-center justify-end pr-2"
-            style={{ width: `${progress}%` }}
+            style={{ width: `${Math.max(progress, 3)}%` }}
           >
             <span className="text-[10px] font-bold text-white">{progress}%</span>
           </div>
         </div>
         <p className="text-xs text-foreground-muted mt-2">
-          ₹{((target - totalRaised)/1000).toFixed(0)}K remaining to target
+          {totalRaised >= target
+            ? "🎉 Target reached!"
+            : `₹${((target - totalRaised)/1000).toFixed(0)}K remaining to target`}
         </p>
       </div>
 
@@ -122,40 +146,47 @@ export default async function DashboardPage() {
           <Link href="/dashboard/sponsors" className="text-xs text-brand-400 hover:text-brand-300 font-semibold">View all →</Link>
         </div>
         <div className="bg-background-secondary border border-border rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Company</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Contact</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Status</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Amount</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Assigned</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockSponsors.slice(0, 5).map((s) => {
-                  const sc = statusConfig[s.status];
-                  return (
-                    <tr key={s.id} className="border-b border-border/50 hover:bg-background transition-colors">
-                      <td className="px-4 py-3 font-semibold text-foreground">{s.company}</td>
-                      <td className="px-4 py-3 text-foreground-muted text-xs">{s.contact}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${sc.color}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                          {sc.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-bold text-foreground">
-                        {s.amount > 0 ? `₹${s.amount.toLocaleString()}` : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-foreground-muted text-xs">{s.assignedTo}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {recentSponsors.length === 0 ? (
+            <div className="py-12 text-center text-foreground-muted text-sm">
+              No sponsors yet.{" "}
+              <Link href="/dashboard/sponsors" className="text-brand-400 hover:underline font-semibold">Add your first one →</Link>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Company</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Contact</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Amount</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Assigned</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentSponsors.map((s) => {
+                    const sc = statusConfig[s.status] || statusConfig["CONTACTED"];
+                    return (
+                      <tr key={s.id} className="border-b border-border/50 hover:bg-background transition-colors">
+                        <td className="px-4 py-3 font-semibold text-foreground">{s.companyName}</td>
+                        <td className="px-4 py-3 text-foreground-muted text-xs">{s.contactName}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${sc.color}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                            {sc.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-bold text-foreground">
+                          {s.amount > 0 ? `₹${s.amount.toLocaleString()}` : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-foreground-muted text-xs">{s.assignedTo || "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
 const MEMBERS = ["Priya", "Raj", "Meera", "Arjun", "Divya", "Siddharth"];
@@ -12,11 +12,31 @@ const STATUS_OPTIONS = [
   { value: "REJECTED",   label: "Rejected",   color: "bg-red-500/15 text-red-400 border-red-500/30" },
 ];
 
+const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
+  CONFIRMED:  { label: "Confirmed",  color: "bg-green-500/15 text-green-400 border-green-500/30",  dot: "bg-green-400" },
+  INTERESTED: { label: "Interested", color: "bg-blue-500/15 text-blue-400 border-blue-500/30",    dot: "bg-blue-400" },
+  CONTACTED:  { label: "Contacted",  color: "bg-amber-500/15 text-amber-400 border-amber-500/30", dot: "bg-amber-400" },
+  REJECTED:   { label: "Rejected",   color: "bg-red-500/15 text-red-400 border-red-500/30",       dot: "bg-red-400" },
+};
+
 interface Sponsor {
   id: string;
-  company: string;
-  contact: string;
-  email: string;
+  companyName: string;
+  contactName: string | null;
+  contactEmail: string;
+  phone: string | null;
+  industry: string | null;
+  status: string;
+  amount: number;
+  assignedTo: string | null;
+  lastContact: string | null;
+  notes: string | null;
+}
+
+type SponsorForm = {
+  companyName: string;
+  contactName: string;
+  contactEmail: string;
   phone: string;
   industry: string;
   status: string;
@@ -24,61 +44,149 @@ interface Sponsor {
   assignedTo: string;
   lastContact: string;
   notes: string;
-}
+};
 
-const INITIAL_SPONSORS: Sponsor[] = [
-  { id: "1", company: "TechCorp India",  contact: "Ravi Sharma",   email: "ravi@techcorp.in",    phone: "9876543210", industry: "Technology",  status: "CONFIRMED",  amount: 150000, assignedTo: "Priya",    lastContact: "2025-06-10", notes: "Title sponsor confirmed. Invoice sent." },
-  { id: "2", company: "Zomato",          contact: "Ananya Patel",  email: "ananya@zomato.com",   phone: "9123456789", industry: "Food Tech",   status: "INTERESTED", amount: 75000,  assignedTo: "Raj",      lastContact: "2025-06-12", notes: "Interested in stall space + social shoutouts." },
-  { id: "3", company: "HDFC Bank",       contact: "Suresh Nair",   email: "suresh@hdfc.com",     phone: "9988776655", industry: "Banking",     status: "CONTACTED",  amount: 200000, assignedTo: "Meera",    lastContact: "2025-06-08", notes: "Need follow-up call this week." },
-  { id: "4", company: "Amul",            contact: "Girish Dave",   email: "girish@amul.coop",    phone: "9765432100", industry: "FMCG",        status: "CONTACTED",  amount: 50000,  assignedTo: "Priya",    lastContact: "2025-06-14", notes: "Waiting for their marketing head response." },
-  { id: "5", company: "Jio Platforms",   contact: "Neha Kapoor",   email: "neha@jio.com",        phone: "9900112233", industry: "Telecom",     status: "INTERESTED", amount: 100000, assignedTo: "Raj",      lastContact: "2025-06-15", notes: "Loves the footfall numbers. Needs proposal." },
-  { id: "6", company: "Myntra",          contact: "Kiran Bhat",    email: "kiran@myntra.com",    phone: "9456789012", industry: "E-Commerce",  status: "REJECTED",   amount: 0,      assignedTo: "Meera",    lastContact: "2025-06-05", notes: "Budget freeze this quarter." },
-];
+const emptyForm: SponsorForm = {
+  companyName: "",
+  contactName: "",
+  contactEmail: "",
+  phone: "",
+  industry: "",
+  status: "CONTACTED",
+  amount: 0,
+  assignedTo: MEMBERS[0],
+  lastContact: new Date().toISOString().slice(0, 10),
+  notes: "",
+};
 
 export default function SponsorsPage() {
-  const [sponsors, setSponsors] = useState<Sponsor[]>(INITIAL_SPONSORS);
+  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState("ALL");
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [form, setForm] = useState<Partial<Sponsor>>({});
+  const [form, setForm] = useState<SponsorForm>(emptyForm);
 
-  const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
-    CONFIRMED:  { label: "Confirmed",  color: "bg-green-500/15 text-green-400 border-green-500/30",  dot: "bg-green-400" },
-    INTERESTED: { label: "Interested", color: "bg-blue-500/15 text-blue-400 border-blue-500/30",    dot: "bg-blue-400" },
-    CONTACTED:  { label: "Contacted",  color: "bg-amber-500/15 text-amber-400 border-amber-500/30", dot: "bg-amber-400" },
-    REJECTED:   { label: "Rejected",   color: "bg-red-500/15 text-red-400 border-red-500/30",       dot: "bg-red-400" },
-  };
+  const loadSponsors = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/sponsors");
+      if (res.ok) {
+        const data = await res.json();
+        setSponsors(data);
+      } else {
+        toast.error("Failed to load sponsors");
+      }
+    } catch {
+      toast.error("Network error loading sponsors");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSponsors();
+  }, [loadSponsors]);
 
   const filtered = sponsors.filter(s => {
     const matchFilter = filter === "ALL" || s.status === filter;
-    const matchSearch = !search || 
-      s.company.toLowerCase().includes(search.toLowerCase()) ||
-      s.contact.toLowerCase().includes(search.toLowerCase()) ||
-      s.industry.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search ||
+      s.companyName.toLowerCase().includes(search.toLowerCase()) ||
+      (s.contactName || "").toLowerCase().includes(search.toLowerCase()) ||
+      (s.industry || "").toLowerCase().includes(search.toLowerCase());
     return matchFilter && matchSearch;
   });
 
-  function openAdd() { setForm({ status: "CONTACTED", assignedTo: MEMBERS[0], amount: 0 }); setShowAdd(true); setEditId(null); }
-  function openEdit(s: Sponsor) { setForm({ ...s }); setEditId(s.id); setShowAdd(true); }
-  function closeModal() { setShowAdd(false); setEditId(null); setForm({}); }
-
-  function saveForm() {
-    if (!form.company || !form.contact || !form.email) { toast.error("Company, contact and email are required"); return; }
-    if (editId) {
-      setSponsors(prev => prev.map(s => s.id === editId ? { ...s, ...form } as Sponsor : s));
-      toast.success("Sponsor updated!");
-    } else {
-      const newSponsor: Sponsor = { ...form, id: Date.now().toString(), lastContact: new Date().toISOString().slice(0, 10) } as Sponsor;
-      setSponsors(prev => [newSponsor, ...prev]);
-      toast.success("Sponsor added!");
-    }
-    closeModal();
+  function openAdd() {
+    setForm({ ...emptyForm, lastContact: new Date().toISOString().slice(0, 10) });
+    setEditId(null);
+    setShowAdd(true);
   }
 
-  function deleteSponsor(id: string) {
-    setSponsors(prev => prev.filter(s => s.id !== id));
-    toast.success("Sponsor removed");
+  function openEdit(s: Sponsor) {
+    setForm({
+      companyName: s.companyName,
+      contactName: s.contactName || "",
+      contactEmail: s.contactEmail,
+      phone: s.phone || "",
+      industry: s.industry || "",
+      status: s.status,
+      amount: s.amount,
+      assignedTo: s.assignedTo || MEMBERS[0],
+      lastContact: s.lastContact || new Date().toISOString().slice(0, 10),
+      notes: s.notes || "",
+    });
+    setEditId(s.id);
+    setShowAdd(true);
+  }
+
+  function closeModal() { setShowAdd(false); setEditId(null); setForm(emptyForm); }
+
+  async function saveForm() {
+    if (!form.companyName || !form.contactEmail) {
+      toast.error("Company name and email are required");
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        companyName: form.companyName,
+        contactEmail: form.contactEmail,
+        contactName: form.contactName || null,
+        phone: form.phone || null,
+        industry: form.industry || null,
+        notes: form.notes || null,
+        status: form.status,
+        amount: form.amount,
+        assignedTo: form.assignedTo || null,
+        lastContact: form.lastContact || null,
+      };
+
+      let res: Response;
+      if (editId) {
+        res = await fetch(`/api/sponsors/${editId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await fetch("/api/sponsors", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      if (res.ok) {
+        toast.success(editId ? "Sponsor updated!" : "Sponsor added!");
+        closeModal();
+        await loadSponsors();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to save sponsor");
+      }
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteSponsor(id: string) {
+    if (!confirm("Remove this sponsor?")) return;
+    try {
+      const res = await fetch(`/api/sponsors/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Sponsor removed");
+        setSponsors(prev => prev.filter(s => s.id !== id));
+      } else {
+        toast.error("Failed to delete sponsor");
+      }
+    } catch {
+      toast.error("Network error");
+    }
   }
 
   const inputClass = "w-full bg-background border border-border text-foreground placeholder-foreground-muted rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-400 transition-all";
@@ -90,7 +198,9 @@ export default function SponsorsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">🏢 Sponsors</h1>
-          <p className="text-foreground-muted text-sm mt-1">{sponsors.length} companies tracked · {sponsors.filter(s => s.status === "CONFIRMED").length} confirmed</p>
+          <p className="text-foreground-muted text-sm mt-1">
+            {loading ? "Loading…" : `${sponsors.length} companies tracked · ${sponsors.filter(s => s.status === "CONFIRMED").length} confirmed`}
+          </p>
         </div>
         <button
           onClick={openAdd}
@@ -129,70 +239,83 @@ export default function SponsorsPage() {
         </div>
       </div>
 
+      {/* Loading skeleton */}
+      {loading && (
+        <div className="bg-background-secondary border border-border rounded-2xl p-8 text-center">
+          <div className="w-8 h-8 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-foreground-muted text-sm">Loading sponsors…</p>
+        </div>
+      )}
+
       {/* Table */}
-      <div className="bg-background-secondary border border-border rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Company</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Contact</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Industry</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Status</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Amount</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Assigned To</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Last Contact</th>
-                <th className="text-right px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="text-center py-12 text-foreground-muted text-sm">
-                    No sponsors found. <button onClick={openAdd} className="text-brand-400 hover:underline font-semibold">Add one →</button>
-                  </td>
+      {!loading && (
+        <div className="bg-background-secondary border border-border rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Company</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Contact</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Industry</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Amount</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Assigned To</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Last Contact</th>
+                  <th className="text-right px-4 py-3 text-xs font-bold text-foreground-muted uppercase tracking-wider">Actions</th>
                 </tr>
-              )}
-              {filtered.map(s => {
-                const sc = statusConfig[s.status];
-                return (
-                  <tr key={s.id} className="border-b border-border/50 hover:bg-background transition-colors group">
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-foreground">{s.company}</div>
-                      <div className="text-xs text-foreground-muted">{s.notes?.slice(0, 40)}{s.notes?.length > 40 ? "…" : ""}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-foreground text-xs font-medium">{s.contact}</div>
-                      <div className="text-foreground-muted text-xs">{s.email}</div>
-                      <div className="text-foreground-muted text-xs">{s.phone}</div>
-                    </td>
-                    <td className="px-4 py-3 text-foreground-muted text-xs">{s.industry}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${sc.color}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
-                        {sc.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-bold text-foreground">
-                      {s.amount > 0 ? `₹${s.amount.toLocaleString()}` : <span className="text-foreground-muted">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs bg-brand-500/10 text-brand-400 px-2 py-1 rounded-lg font-semibold">{s.assignedTo}</span>
-                    </td>
-                    <td className="px-4 py-3 text-foreground-muted text-xs">{s.lastContact}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => openEdit(s)} className="text-xs text-brand-400 hover:text-brand-300 font-semibold px-2 py-1 rounded-lg hover:bg-brand-500/10 transition-all">Edit</button>
-                        <button onClick={() => deleteSponsor(s.id)} className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded-lg hover:bg-red-500/10 transition-all">Delete</button>
-                      </div>
+              </thead>
+              <tbody>
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="text-center py-12 text-foreground-muted text-sm">
+                      {search || filter !== "ALL" ? "No sponsors match your filter." : "No sponsors yet."}{" "}
+                      <button onClick={openAdd} className="text-brand-400 hover:underline font-semibold">Add one →</button>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                )}
+                {filtered.map(s => {
+                  const sc = statusConfig[s.status] || statusConfig["CONTACTED"];
+                  return (
+                    <tr key={s.id} className="border-b border-border/50 hover:bg-background transition-colors group">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-foreground">{s.companyName}</div>
+                        <div className="text-xs text-foreground-muted">{s.notes?.slice(0, 40)}{(s.notes?.length || 0) > 40 ? "…" : ""}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-foreground text-xs font-medium">{s.contactName}</div>
+                        <div className="text-foreground-muted text-xs">{s.contactEmail}</div>
+                        <div className="text-foreground-muted text-xs">{s.phone}</div>
+                      </td>
+                      <td className="px-4 py-3 text-foreground-muted text-xs">{s.industry}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${sc.color}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                          {sc.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-bold text-foreground">
+                        {s.amount > 0 ? `₹${s.amount.toLocaleString()}` : <span className="text-foreground-muted">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {s.assignedTo && (
+                          <span className="text-xs bg-brand-500/10 text-brand-400 px-2 py-1 rounded-lg font-semibold">{s.assignedTo}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-foreground-muted text-xs">{s.lastContact}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => openEdit(s)} className="text-xs text-brand-400 hover:text-brand-300 font-semibold px-2 py-1 rounded-lg hover:bg-brand-500/10 transition-all">Edit</button>
+                          <button onClick={() => deleteSponsor(s.id)} className="text-xs text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded-lg hover:bg-red-500/10 transition-all">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Add/Edit Modal */}
       {showAdd && (
@@ -206,54 +329,62 @@ export default function SponsorsPage() {
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
                 <label className={labelClass}>Company Name *</label>
-                <input value={form.company || ""} onChange={e => setForm(f => ({...f, company: e.target.value}))} placeholder="e.g. Zomato" className={inputClass} />
+                <input value={form.companyName} onChange={e => setForm(f => ({...f, companyName: e.target.value}))} placeholder="e.g. Zomato" className={inputClass} />
               </div>
               <div>
-                <label className={labelClass}>Contact Person *</label>
-                <input value={form.contact || ""} onChange={e => setForm(f => ({...f, contact: e.target.value}))} placeholder="Full name" className={inputClass} />
+                <label className={labelClass}>Contact Person</label>
+                <input value={form.contactName} onChange={e => setForm(f => ({...f, contactName: e.target.value}))} placeholder="Full name" className={inputClass} />
               </div>
               <div>
                 <label className={labelClass}>Industry</label>
-                <input value={form.industry || ""} onChange={e => setForm(f => ({...f, industry: e.target.value}))} placeholder="e.g. Food Tech" className={inputClass} />
+                <input value={form.industry} onChange={e => setForm(f => ({...f, industry: e.target.value}))} placeholder="e.g. Food Tech" className={inputClass} />
               </div>
               <div>
                 <label className={labelClass}>Email *</label>
-                <input type="email" value={form.email || ""} onChange={e => setForm(f => ({...f, email: e.target.value}))} placeholder="contact@company.com" className={inputClass} />
+                <input type="email" value={form.contactEmail} onChange={e => setForm(f => ({...f, contactEmail: e.target.value}))} placeholder="contact@company.com" className={inputClass} />
               </div>
               <div>
                 <label className={labelClass}>Phone</label>
-                <input value={form.phone || ""} onChange={e => setForm(f => ({...f, phone: e.target.value}))} placeholder="9876543210" className={inputClass} />
+                <input value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))} placeholder="9876543210" className={inputClass} />
               </div>
               <div>
                 <label className={labelClass}>Status</label>
-                <select value={form.status || "CONTACTED"} onChange={e => setForm(f => ({...f, status: e.target.value}))} className={inputClass}>
+                <select value={form.status} onChange={e => setForm(f => ({...f, status: e.target.value}))} className={inputClass}>
                   {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               <div>
                 <label className={labelClass}>Amount (₹)</label>
-                <input type="number" value={form.amount || 0} onChange={e => setForm(f => ({...f, amount: Number(e.target.value)}))} placeholder="100000" className={inputClass} />
+                <input type="number" value={form.amount} onChange={e => setForm(f => ({...f, amount: Number(e.target.value)}))} placeholder="100000" className={inputClass} />
               </div>
               <div>
                 <label className={labelClass}>Assigned To</label>
-                <select value={form.assignedTo || MEMBERS[0]} onChange={e => setForm(f => ({...f, assignedTo: e.target.value}))} className={inputClass}>
+                <select value={form.assignedTo} onChange={e => setForm(f => ({...f, assignedTo: e.target.value}))} className={inputClass}>
                   {MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
               <div>
                 <label className={labelClass}>Last Contact Date</label>
-                <input type="date" value={form.lastContact || ""} onChange={e => setForm(f => ({...f, lastContact: e.target.value}))} className={inputClass} />
+                <input type="date" value={form.lastContact} onChange={e => setForm(f => ({...f, lastContact: e.target.value}))} className={inputClass} />
               </div>
               <div className="sm:col-span-2">
                 <label className={labelClass}>Notes</label>
-                <textarea value={form.notes || ""} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={3} placeholder="Follow-up notes, interests, next steps…" className={inputClass} />
+                <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={3} placeholder="Follow-up notes, interests, next steps…" className={inputClass} />
               </div>
             </div>
 
             <div className="flex gap-3 mt-6">
               <button onClick={closeModal} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-foreground-muted text-sm font-semibold hover:bg-background transition-all">Cancel</button>
-              <button onClick={saveForm} className="flex-1 btn-shine gradient-brand text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-brand-500/25 hover:scale-105 transition-all">
-                {editId ? "Save Changes" : "Add Sponsor"}
+              <button
+                onClick={saveForm}
+                disabled={saving}
+                className="flex-1 btn-shine gradient-brand text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-brand-500/25 hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
+                ) : (
+                  editId ? "Save Changes" : "Add Sponsor"
+                )}
               </button>
             </div>
           </div>

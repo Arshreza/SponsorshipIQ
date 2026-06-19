@@ -43,7 +43,21 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { companyName, contactEmail, contactName, jobTitle, website, industry, city, notes } = body;
+    const {
+      companyName,
+      contactEmail,
+      contactName,
+      jobTitle,
+      website,
+      industry,
+      city,
+      phone,
+      notes,
+      status,
+      amount,
+      assignedTo,
+      lastContact,
+    } = body;
 
     const sponsor = await db.sponsor.findFirst({
       where: { id, userId: session.user.id },
@@ -56,14 +70,19 @@ export async function PATCH(
     const updated = await db.sponsor.update({
       where: { id },
       data: {
-        companyName: companyName !== undefined ? companyName : undefined,
-        contactEmail: contactEmail !== undefined ? contactEmail : undefined,
-        contactName: contactName !== undefined ? contactName : undefined,
-        jobTitle: jobTitle !== undefined ? jobTitle : undefined,
-        website: website !== undefined ? website : undefined,
-        industry: industry !== undefined ? industry : undefined,
-        city: city !== undefined ? city : undefined,
-        notes: notes !== undefined ? notes : undefined,
+        ...(companyName !== undefined && { companyName }),
+        ...(contactEmail !== undefined && { contactEmail }),
+        ...(contactName !== undefined && { contactName }),
+        ...(jobTitle !== undefined && { jobTitle }),
+        ...(website !== undefined && { website }),
+        ...(industry !== undefined && { industry }),
+        ...(city !== undefined && { city }),
+        ...(phone !== undefined && { phone }),
+        ...(notes !== undefined && { notes }),
+        ...(status !== undefined && { status }),
+        ...(amount !== undefined && { amount }),
+        ...(assignedTo !== undefined && { assignedTo }),
+        ...(lastContact !== undefined && { lastContact }),
       },
     });
 

@@ -1,17 +1,19 @@
-import NextAuth from "next-auth";
-import authConfig from "@/lib/auth.config";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-
-const { auth } = NextAuth(authConfig);
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Protect dashboard routes
   if (pathname.startsWith("/dashboard")) {
-    const session = await auth();
-    if (!session) {
+    // Read the session tokens for Next-Auth
+    const sessionToken =
+      request.cookies.get("authjs.session-token")?.value ||
+      request.cookies.get("__Secure-authjs.session-token")?.value ||
+      request.cookies.get("next-auth.session-token")?.value ||
+      request.cookies.get("__Secure-next-auth.session-token")?.value;
+
+    if (!sessionToken) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
   }

@@ -339,6 +339,7 @@ model GlobalSettings {
   id               String   @id @default(cuid())
   userId           String   @unique
   dailyEmailLimit  Int      @default(100)
+  targetAmount     Int      @default(750000)
   followupsData    String?  @db.Text // JSON array of FollowUp objects
   paymentsData     String?  @db.Text // JSON array of Payment objects
   createdAt        DateTime @default(now())

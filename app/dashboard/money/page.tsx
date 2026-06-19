@@ -25,8 +25,6 @@ const TIER_OPTIONS = [
 
 const MODE_OPTIONS = ["NEFT", "UPI", "Cheque", "RTGS", "Bank Transfer", "Cash"];
 
-const TARGET = 750000;
-
 const emptyForm: Omit<Payment, "id"> = {
   company: "",
   tier: "Title Sponsor",
@@ -39,29 +37,40 @@ const emptyForm: Omit<Payment, "id"> = {
 
 export default function MoneyPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [target, setTarget] = useState(750000);
+  const [editingTarget, setEditingTarget] = useState(false);
+  const [targetInput, setTargetInput] = useState("750000");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<Omit<Payment, "id">>(emptyForm);
 
-  const loadPayments = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/money");
-      if (res.ok) {
-        const data = await res.json();
+      const [resPayments, resTarget] = await Promise.all([
+        fetch("/api/money"),
+        fetch("/api/settings/target")
+      ]);
+      if (resPayments.ok) {
+        const data = await resPayments.json();
         setPayments(data);
       } else {
         toast.error("Failed to load payments");
       }
+      if (resTarget.ok) {
+        const targetData = await resTarget.json();
+        setTarget(targetData.targetAmount);
+        setTargetInput(targetData.targetAmount.toString());
+      }
     } catch {
-      toast.error("Network error loading payments");
+      toast.error("Network error loading data");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadPayments(); }, [loadPayments]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   async function persistPayments(newPayments: Payment[]) {
     setSaving(true);
@@ -79,7 +88,34 @@ export default function MoneyPage() {
     }
   }
 
-  const totalTarget    = TARGET;
+  async function saveTarget() {
+    const parsed = parseInt(targetInput, 10);
+    if (isNaN(parsed) || parsed < 0) {
+      toast.error("Please enter a valid target amount");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings/target", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetAmount: parsed }),
+      });
+      if (res.ok) {
+        setTarget(parsed);
+        setEditingTarget(false);
+        toast.success("Target updated successfully! 🎯");
+      } else {
+        toast.error("Failed to update target");
+      }
+    } catch {
+      toast.error("Network error updating target");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const totalTarget    = target;
   const totalPaid      = payments.filter(p => p.status === "PAID").reduce((s, p) => s + p.amount, 0);
   const totalPending   = payments.filter(p => p.status !== "PAID").reduce((s, p) => s + p.amount, 0);
   const totalConfirmed = payments.reduce((s, p) => s + p.amount, 0);
@@ -151,8 +187,18 @@ export default function MoneyPage() {
           { label: "Total Confirmed",   value: `₹${(totalConfirmed/1000).toFixed(0)}K`, icon: "🏆", color: "text-brand-400" },
           { label: "Target",            value: `₹${(totalTarget/1000).toFixed(0)}K`,   icon: "🎯", color: "text-purple-400" },
         ].map((c, i) => (
-          <div key={i} className="bg-background-secondary border border-border rounded-2xl p-5 spotlight-card">
-            <div className="text-2xl mb-2">{c.icon}</div>
+          <div key={i} className="bg-background-secondary border border-border rounded-2xl p-5 spotlight-card relative group">
+            <div className="flex justify-between items-start">
+              <div className="text-2xl mb-2">{c.icon}</div>
+              {c.label === "Target" && (
+                <button
+                  onClick={() => setEditingTarget(true)}
+                  className="opacity-0 group-hover:opacity-100 text-xs text-brand-400 hover:text-brand-300 font-semibold transition-opacity flex items-center gap-1"
+                >
+                  ✏️ Edit
+                </button>
+              )}
+            </div>
             <div className={`text-2xl font-extrabold ${c.color}`}>{c.value}</div>
             <div className="text-xs text-foreground-muted mt-1">{c.label}</div>
           </div>
@@ -331,6 +377,44 @@ export default function MoneyPage() {
               <button onClick={() => { setShowAdd(false); setForm(emptyForm); }} className="flex-1 px-4 py-2.5 rounded-xl border border-border text-foreground-muted text-sm font-semibold hover:bg-background transition-all">Cancel</button>
               <button onClick={addPayment} className="flex-1 btn-shine gradient-brand text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-brand-500/25 hover:scale-105 transition-all">
                 Add Entry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Target Modal */}
+      {editingTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-background-secondary border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-bold text-foreground">Set Sponsorship Target</h2>
+              <button onClick={() => setEditingTarget(false)} className="text-foreground-muted hover:text-foreground text-lg">✕</button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className={labelClass}>Target Amount (₹)</label>
+                <input
+                  type="number"
+                  value={targetInput}
+                  onChange={e => setTargetInput(e.target.value)}
+                  className={inputClass}
+                  placeholder="750000"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setEditingTarget(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-border text-foreground-muted text-sm font-semibold hover:bg-background transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveTarget}
+                className="flex-1 btn-shine gradient-brand text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-brand-500/25 hover:scale-105 transition-all"
+              >
+                Save Target
               </button>
             </div>
           </div>

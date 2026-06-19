@@ -10,8 +10,12 @@ const navItems = [
   { href: "/dashboard/sponsors",           icon: "🏢", label: "Sponsors",         exact: false },
   { href: "/dashboard/money",              icon: "💰", label: "Money Tracker",     exact: false },
   { href: "/dashboard/followups",          icon: "📋", label: "Follow-ups",        exact: false },
-  { href: "/dashboard/ai-email",           icon: "🤖", label: "AI Cold Email",     exact: false },
+  
+  { href: "/dashboard/campaigns",          icon: "📧", label: "Email Campaigns",   exact: false },
+  { href: "/dashboard/ai-email",           icon: "🤖", label: "AI Pitch Gen",      exact: false },
   { href: "/dashboard/ai-proposal",        icon: "📄", label: "AI Proposal PDF",   exact: false },
+  
+  { href: "/dashboard/settings/email",     icon: "⚙️", label: "Email Settings",   exact: false },
 ];
 
 export function Sidebar() {
@@ -57,8 +61,28 @@ export function Sidebar() {
           </Link>
         ))}
 
-        <p className="text-[10px] font-bold text-sidebar-fg-muted uppercase tracking-widest px-3 pb-2 pt-4">🤖 AI Features</p>
-        {navItems.slice(4).map((item) => (
+        <p className="text-[10px] font-bold text-sidebar-fg-muted uppercase tracking-widest px-3 pb-2 pt-4">📧 Outreach</p>
+        {navItems.slice(4, 7).map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
+              isActive(item)
+                ? "bg-brand-600/20 text-brand-300 border border-brand-600/30"
+                : "text-sidebar-fg-muted hover:text-sidebar-fg hover:bg-sidebar-hover"
+            )}
+          >
+            <span className="text-base w-5 text-center shrink-0">{item.icon}</span>
+            <span>{item.label}</span>
+            {isActive(item) && (
+              <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse-soft" />
+            )}
+          </Link>
+        ))}
+
+        <p className="text-[10px] font-bold text-sidebar-fg-muted uppercase tracking-widest px-3 pb-2 pt-4">⚙️ Settings</p>
+        {navItems.slice(7).map((item) => (
           <Link
             key={item.href}
             href={item.href}

@@ -285,3 +285,134 @@ export async function generateFollowupPitch(
   }
 }
 
+export function buildCampaignPitchPrompt(ctx: PitchContext): {
+  system: string;
+  user: string;
+} {
+  const system = `You are a senior sponsorship outreach specialist for college festivals in India. 
+You write concise, compelling, highly personalized cold outreach emails to brands to secure an initial conversation.
+
+RULES:
+1. Open with a genuine, specific hook — reference something real about the brand (recent campaign, product launch, CSR initiative, or known marketing focus for their industry)
+2. Connect the brand's audience/goals to the fest's demographics (college students aged 18-22)
+3. DO NOT mention any financial tiers, packages, pricing, or numbers about money (e.g., ₹2,00,000, Title Sponsor, Gold Package, 50k, etc.). This is strictly forbidden. The email is solely to start a conversation.
+4. Keep the email under ${ctx.emailWordLimit || 200} words
+5. Tone: ${ctx.toneOfVoice || "Professional yet energetic, peer-to-peer, not corporate"}
+6. End with a clear, easy CTA — a 15-minute call or a deck link
+7. NO generic openings like "I hope this email finds you well"
+8. NO mention of other competing brands
+9. Sign off with the sender's name and fest
+
+${ctx.guidelines ? `ADDITIONAL GUIDELINES:\n${ctx.guidelines}` : ""}`;
+
+  const user = `Write a sponsorship pitch email for:
+
+FEST PROFILE:
+- Name: ${ctx.festName}${ctx.edition ? ` (${ctx.edition})` : ""}
+- Type: ${ctx.festType || "College Festival"}
+- College: ${ctx.college || "Premier engineering college"}
+- City: ${ctx.city || "India"}
+- Theme: ${ctx.theme || "Innovation & Culture"}
+- Dates: ${ctx.eventDates || "Coming soon"}
+- Expected Footfall: ${ctx.expectedFootfall ? `${ctx.expectedFootfall.toLocaleString()} attendees` : "3,000+ students"}
+- Social Media Reach: ${ctx.socialMediaReach ? `${ctx.socialMediaReach.toLocaleString()} followers` : "10,000+ across platforms"}
+${ctx.pitchHighlights ? `- Highlights: ${ctx.pitchHighlights}` : ""}
+
+TARGET BRAND:
+- Company: ${ctx.companyName}
+- Industry: ${ctx.industry || "Not specified"}
+- Website: ${ctx.website || "Not available"}
+${ctx.contactName ? `- Contact: ${ctx.contactName}` : ""}
+${ctx.aiResearch ? `- Brand Research: ${ctx.aiResearch}` : ""}
+
+SENDER:
+- Name: ${ctx.senderName || "Sponsorship Team"}
+- Email: ${ctx.senderEmail}
+- Role: Sponsorship Committee, ${ctx.festName}
+
+${ctx.subjectTemplate ? `SUBJECT LINE TEMPLATE: ${ctx.subjectTemplate}` : ""}
+
+Output JSON with exactly these fields:
+{
+  "subject": "email subject line",
+  "body": "full email body as plain text with \\n for line breaks"
+}`;
+
+  return { system, user };
+}
+
+function getMockCampaignPitch(ctx: PitchContext): { subject: string; body: string } {
+  const fest = ctx.festName;
+  const company = ctx.companyName;
+  const industry = ctx.industry || "marketing and engagement";
+
+  const subject = ctx.subjectTemplate
+    ? ctx.subjectTemplate.replace(/{festName}/g, fest).replace(/{companyName}/g, company).replace(/{subjectTemplate}/g, fest)
+    : `🚀 Sponsorship Outreach: ${fest} x ${company}`;
+
+  const body = `Dear ${ctx.contactName || "Marketing Team"},\n\n` +
+    `I am writing on behalf of the organizing committee of ${fest}, the premier ${ctx.festType || "cultural and technical"} festival of ${ctx.college || "our university"}.\n\n` +
+    `We have been following ${company}'s active footprints in the ${industry} space and admire your brand's focus on connecting with the youth. ${fest} attracts over ${ctx.expectedFootfall?.toLocaleString() || "5,000"} students, offering an unparalleled platform for ${company} to launch brand campaigns and acquire campus brand advocates.\n\n` +
+    `We'd love to explore how we can support ${company}'s brand goals at our upcoming festival. I would love to share our sponsorship deck with you. Would you be available for a brief 5-minute call this week?\n\n` +
+    `Best regards,\n` +
+    `${ctx.senderName || "Sponsorship Committee"}\n` +
+    `${ctx.senderEmail}`;
+
+  return { subject, body };
+}
+
+export async function generateCampaignPitch(
+  ctx: PitchContext,
+  llmConfig: LlmConfig
+): Promise<{ subject: string; body: string }> {
+  const apiKey = llmConfig.apiKey;
+  const isMock = !apiKey || apiKey === "mock" || apiKey.includes("mock") || apiKey.includes("change_in_production");
+  if (isMock) {
+    return getMockCampaignPitch(ctx);
+  }
+
+  try {
+    const { system, user } = buildCampaignPitchPrompt(ctx);
+
+    const response = await fetch(`${llmConfig.apiBaseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${llmConfig.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: llmConfig.modelName || "claude-3-5-sonnet-20241022",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        max_tokens: 1024,
+        temperature: 0.8,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`LLM API error ${response.status}: ${err}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "";
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("LLM did not return valid JSON for campaign pitch");
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed.subject || !parsed.body) {
+      throw new Error("LLM response missing subject or body for campaign pitch");
+    }
+
+    return { subject: parsed.subject, body: parsed.body };
+  } catch (err) {
+    console.error("[generateCampaignPitch] LLM generation failed, using mock fallback:", err);
+    return getMockCampaignPitch(ctx);
+  }
+}
+

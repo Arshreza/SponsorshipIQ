@@ -36,7 +36,7 @@ const createMockPrismaClient = () => {
       { id: "llm-1", apiBaseUrl: "https://api.openai.com/v1", apiKey: "mock-key", modelName: "gpt-4", isValid: true }
     ],
     globalSettings: [
-      { id: "settings-1", dailyEmailLimit: 100 }
+      { id: "settings-1", dailyEmailLimit: 100, targetAmount: 750000 }
     ]
   };
 

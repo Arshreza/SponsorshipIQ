@@ -45,7 +45,7 @@ export default async function DashboardPage() {
     totalRaised = confirmed.reduce((sum, s) => sum + s.amount, 0);
   }
 
-  const target   = 750000;
+  const target   = (globalSettings as any)?.targetAmount ?? 750000;
   const progress = Math.min(Math.round((totalRaised / target) * 100), 100);
 
   const stats = [

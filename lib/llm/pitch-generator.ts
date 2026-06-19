@@ -118,7 +118,7 @@ function getMockPitch(ctx: PitchContext): { subject: string; body: string } {
   const amount = ctx.packages ? "₹1,00,000" : "₹1,50,000";
 
   const subject = ctx.subjectTemplate 
-    ? ctx.subjectTemplate.replace(/{festName}/g, fest).replace(/{companyName}/g, company)
+    ? ctx.subjectTemplate.replace(/{{?festName}}?/g, fest).replace(/{{?companyName}}?/g, company)
     : `🚀 Sponsorship Outreach: ${fest} x ${company}`;
 
   const body = `Dear ${ctx.contactName || "Marketing Team"},\n\n` +
@@ -347,7 +347,7 @@ function getMockCampaignPitch(ctx: PitchContext): { subject: string; body: strin
   const industry = ctx.industry || "marketing and engagement";
 
   const subject = ctx.subjectTemplate
-    ? ctx.subjectTemplate.replace(/{festName}/g, fest).replace(/{companyName}/g, company).replace(/{subjectTemplate}/g, fest)
+    ? ctx.subjectTemplate.replace(/{{?festName}}?/g, fest).replace(/{{?companyName}}?/g, company)
     : `🚀 Sponsorship Outreach: ${fest} x ${company}`;
 
   const body = `Dear ${ctx.contactName || "Marketing Team"},\n\n` +

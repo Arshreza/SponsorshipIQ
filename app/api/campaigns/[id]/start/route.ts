@@ -25,6 +25,20 @@ export async function POST(
       return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     }
 
+    if (action === "start") {
+      if (!campaign.emailAccountId) {
+        return NextResponse.json({ error: "No email sender account linked to this campaign. Please connect and select an email account first." }, { status: 400 });
+      }
+      
+      const emailAcc = await db.emailAccount.findUnique({
+        where: { id: campaign.emailAccountId } as any,
+      });
+
+      if (!emailAcc || emailAcc.status !== "CONNECTED") {
+        return NextResponse.json({ error: "The linked email account is disconnected or invalid. Please verify it in Email Settings." }, { status: 400 });
+      }
+    }
+
     const newStatus = action === "start" ? "ACTIVE" : "PAUSED";
 
     const updatedCampaign = await db.campaign.update({

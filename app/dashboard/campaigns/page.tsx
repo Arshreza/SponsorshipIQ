@@ -65,7 +65,8 @@ export default function CampaignsPage() {
         toast.success(action === "start" ? "Campaign launched! 🚀 Sending emails autonomously in the background." : "Campaign paused.");
         setCampaigns(campaigns.map(c => c.id === id ? { ...c, status: data.status } : c));
       } else {
-        toast.error("Failed to execute campaign action");
+        const err = await res.json();
+        toast.error(err.error || "Failed to execute campaign action");
       }
     } catch {
       toast.error("Network error executing action");

@@ -52,6 +52,7 @@ export function SponsorDetailClient({ sponsor: initialSponsor }: { sponsor: Spon
   const [notes, setNotes] = useState(initialSponsor.notes || "");
   const [savingNotes, setSavingNotes] = useState(false);
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
+  const [researching, setResearching] = useState(false);
 
   const sc = statusConfig[sponsor.status] || statusConfig["CONTACTED"];
 
@@ -169,12 +170,43 @@ export function SponsorDetailClient({ sponsor: initialSponsor }: { sponsor: Spon
       </div>
 
       {/* AI Research */}
-      {sponsor.aiResearch && (
-        <div className="bg-brand-500/5 border border-brand-500/20 rounded-2xl p-5">
-          <h2 className="text-xs font-bold text-brand-400 uppercase tracking-wider mb-3">🤖 AI Research Summary</h2>
-          <p className="text-sm text-foreground leading-relaxed">{sponsor.aiResearch}</p>
+      <div className="bg-brand-500/5 border border-brand-500/20 rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-bold text-brand-400 uppercase tracking-wider">🤖 AI Brand Research</h2>
+          <button
+            onClick={async () => {
+              setResearching(true);
+              try {
+                const res = await fetch(`/api/sponsors/${sponsor.id}/research`, { method: "POST" });
+                if (res.ok) {
+                  const data = await res.json();
+                  setSponsor(s => ({ ...s, aiResearch: data.aiResearch }));
+                  toast.success("AI research complete!");
+                } else {
+                  toast.error("Research failed");
+                }
+              } catch {
+                toast.error("Network error");
+              } finally {
+                setResearching(false);
+              }
+            }}
+            disabled={researching}
+            className="text-xs font-bold px-3 py-1.5 rounded-xl border border-brand-500/30 bg-brand-500/10 text-brand-400 hover:bg-brand-500/20 transition-all disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {researching ? (
+              <><span className="w-3 h-3 border border-brand-400/40 border-t-brand-400 rounded-full animate-spin" /> Researching…</>
+            ) : sponsor.aiResearch ? "Re-research" : "Run AI Research"}
+          </button>
         </div>
-      )}
+        {sponsor.aiResearch ? (
+          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{sponsor.aiResearch}</p>
+        ) : (
+          <p className="text-xs text-foreground-muted italic">
+            Click "Run AI Research" to get a brand dossier — target demographics, marketing angle, and outreach suggestions tailored to {sponsor.companyName}.
+          </p>
+        )}
+      </div>
 
       {/* Outreach History */}
       <div>

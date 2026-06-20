@@ -16,6 +16,7 @@ const navItems = [
   { href: "/dashboard/ai-proposal",        icon: "📄", label: "AI Proposal PDF",   exact: false },
   
   { href: "/dashboard/settings/email",     icon: "⚙️", label: "Email Settings",   exact: false },
+  { href: "/dashboard/settings/fest",      icon: "🎪", label: "Fest Profile",      exact: false },
 ];
 
 export function Sidebar() {

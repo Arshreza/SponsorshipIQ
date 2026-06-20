@@ -182,9 +182,9 @@ export default function CampaignsPage() {
                 <div>
                   {/* Title & Status */}
                   <div className="flex items-start justify-between gap-4 mb-4">
-                    <h3 className="font-bold text-lg text-foreground hover:text-brand-400 transition-colors">
+                    <Link href={`/dashboard/campaigns/${c.id}`} className="font-bold text-lg text-foreground hover:text-brand-400 transition-colors">
                       {c.name}
-                    </h3>
+                    </Link>
                     <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${sc.color}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
                       {sc.label}

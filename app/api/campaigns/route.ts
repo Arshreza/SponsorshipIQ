@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Campaign name and Sponsor List are required" }, { status: 400 });
     }
 
+    if (sponsorIds !== undefined && (!Array.isArray(sponsorIds) || sponsorIds.length === 0)) {
+      return NextResponse.json({ error: "Select at least one sponsor to target" }, { status: 400 });
+    }
+
     // Ensure user has at least one FestProfile. If not, create a default one
     let festProfile = await db.festProfile.findFirst({
       where: { userId: session.user.id },

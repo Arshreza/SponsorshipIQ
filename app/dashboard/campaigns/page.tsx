@@ -16,6 +16,10 @@ interface Campaign {
   launchedAt: string | null;
   createdAt: string;
   emailAccountId?: string | null;
+  scheduleEnabled?: boolean;
+  scheduledHour?: number;
+  scheduledDays?: string;
+  batchSize?: number;
 }
 
 const statusConfig: Record<string, { label: string; color: string; dot: string }> = {
@@ -94,7 +98,7 @@ export default function CampaignsPage() {
   async function handleProcessNow(campaignId: string) {
     setProcessingId(campaignId);
     try {
-      const res = await fetch("/api/cron/process-outreach");
+      const res = await fetch("/api/cron/process-outreach?force=1");
       if (res.ok) {
         const data = await res.json();
         const sent = data.details?.filter((d: any) => d.status === "SENT").length || 0;
@@ -237,7 +241,7 @@ export default function CampaignsPage() {
 
                   {/* Progress Bar */}
                   {c.totalSponsors > 0 && (
-                    <div className="mb-4">
+                    <div className="mb-3">
                       <div className="flex justify-between text-[10px] text-foreground-muted mb-1">
                         <span>Outreach progress</span>
                         <span>{c.sent} / {c.totalSponsors} sent</span>
@@ -248,6 +252,18 @@ export default function CampaignsPage() {
                           style={{ width: `${Math.min(100, Math.round((c.sent / c.totalSponsors) * 100))}%` }}
                         />
                       </div>
+                    </div>
+                  )}
+
+                  {/* Schedule badge */}
+                  {c.scheduleEnabled ? (
+                    <div className="mb-3 inline-flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-brand-500/10 border border-brand-500/25 text-brand-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
+                      Auto-schedule: {c.batchSize ?? 3}/day · {(c.scheduledDays || "MON–FRI")} at {c.scheduledHour ?? 9}:00 UTC
+                    </div>
+                  ) : (
+                    <div className="mb-3 inline-flex items-center gap-1.5 text-[10px] text-foreground-muted">
+                      ⏸ Manual send only
                     </div>
                   )}
                 </div>

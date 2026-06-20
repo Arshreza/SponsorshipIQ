@@ -13,6 +13,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const now = new Date();
+  const utcHour = now.getUTCHours();
+  const DAY_CODES = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  const utcDay = DAY_CODES[now.getUTCDay()];
+  // Detect if this is a forced manual trigger (query param ?force=1 or no schedule check needed)
+  const isForced = req.nextUrl?.searchParams?.get("force") === "1";
+
   try {
     // 1. Find ACTIVE campaigns
     const activeCampaigns = await db.campaign.findMany({
@@ -31,14 +38,26 @@ export async function GET(req: NextRequest) {
 
     // 2. Process pending outreaches for active campaigns
     for (const campaign of activeCampaigns) {
+      // Schedule check: if scheduleEnabled, only run on the right day/hour
+      // (skip for manual "Send Now" invocations which pass ?force=1)
+      if (!isForced && (campaign as any).scheduleEnabled) {
+        const allowedDays: string[] = ((campaign as any).scheduledDays || "MON,TUE,WED,THU,FRI").split(",").map((d: string) => d.trim());
+        const scheduledHour: number = (campaign as any).scheduledHour ?? 9;
+        if (!allowedDays.includes(utcDay) || utcHour !== scheduledHour) {
+          processed.push({ campaignId: campaign.id, status: "SCHEDULE_SKIPPED", reason: `Not the right time (${utcDay} ${utcHour}:xx UTC, expected ${allowedDays.join("/")} at ${scheduledHour}:00 UTC)` });
+          continue;
+        }
+        // Mark last scheduled execution time
+        await db.campaign.update({ where: { id: campaign.id }, data: { lastScheduledAt: now } as any });
+      }
+
       // Reset daily counter if it's a new day
       if (campaign.emailAccount) {
         const lastReset = new Date(campaign.emailAccount.lastResetDate);
-        const today = new Date();
-        if (lastReset.toDateString() !== today.toDateString()) {
+        if (lastReset.toDateString() !== now.toDateString()) {
           await db.emailAccount.update({
             where: { id: campaign.emailAccount.id },
-            data: { sentToday: 0, lastResetDate: today },
+            data: { sentToday: 0, lastResetDate: now },
           });
           campaign.emailAccount.sentToday = 0;
         }
@@ -49,6 +68,8 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      const batchSize: number = (campaign as any).batchSize ?? 3;
+
       // Find pending outreaches for this campaign
       const pendingOutreaches = await db.outreach.findMany({
         where: {
@@ -58,7 +79,7 @@ export async function GET(req: NextRequest) {
         include: {
           sponsor: true,
         } as any,
-        take: 3, // process in small batches of 3 per cron trigger
+        take: batchSize,
       });
 
       for (const outreach of pendingOutreaches) {

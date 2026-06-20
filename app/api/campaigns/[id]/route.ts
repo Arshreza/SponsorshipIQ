@@ -29,7 +29,7 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { emailAccountId, name, guidelines, toneOfVoice, emailWordLimit, subjectTemplate } = body;
+    const { emailAccountId, name, guidelines, toneOfVoice, emailWordLimit, subjectTemplate, scheduleEnabled, scheduledHour, scheduledDays, batchSize } = body;
 
     const campaign = await db.campaign.findUnique({
       where: { id, userId: session.user.id } as any,
@@ -58,6 +58,10 @@ export async function PATCH(
         ...(toneOfVoice !== undefined && { toneOfVoice }),
         ...(emailWordLimit !== undefined && { emailWordLimit: Number(emailWordLimit) }),
         ...(subjectTemplate !== undefined && { subjectTemplate }),
+        ...(scheduleEnabled !== undefined && { scheduleEnabled: Boolean(scheduleEnabled) }),
+        ...(scheduledHour !== undefined && { scheduledHour: Number(scheduledHour) }),
+        ...(scheduledDays !== undefined && { scheduledDays }),
+        ...(batchSize !== undefined && { batchSize: Number(batchSize) }),
       } as any,
     });
 

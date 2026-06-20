@@ -247,6 +247,12 @@ model Campaign {
   toneOfVoice     String?        // "Professional", "Enthusiastic", "Formal"
   emailWordLimit  Int            @default(200)
   subjectTemplate String?
+  // Schedule (autonomous sending)
+  scheduleEnabled Boolean        @default(false)
+  scheduledHour   Int            @default(9)   // 0-23 UTC hour to send
+  scheduledDays   String         @default("MON,TUE,WED,THU,FRI") // comma-separated day codes
+  batchSize       Int            @default(3)   // sponsors to process per cron trigger
+  lastScheduledAt DateTime?      // last time cron actually processed this campaign
   // Stats
   totalSponsors   Int            @default(0)
   drafted         Int            @default(0)

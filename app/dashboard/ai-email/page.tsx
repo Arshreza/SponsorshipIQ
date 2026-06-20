@@ -288,9 +288,11 @@ export default function AIEmailPage() {
 
           {email && (
             <div className="flex-1 flex flex-col gap-4">
-              <div className="flex-1 bg-background rounded-xl p-4 text-sm text-foreground leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[360px] border border-border">
-                {email}
-              </div>
+              <textarea
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="flex-1 bg-background rounded-xl p-4 text-sm text-foreground leading-relaxed resize-none overflow-y-auto max-h-[360px] min-h-[200px] border border-border focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition-all w-full"
+              />
 
               {/* Send directly */}
               <div className="border-t border-border pt-4 space-y-3">

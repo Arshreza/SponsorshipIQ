@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { generateCampaignPitch } from "@/lib/llm/pitch-generator";
-import { sendGmail } from "@/lib/gmail";
+import { sendEmail } from "@/lib/email/sender";
 import { decrypt } from "@/lib/encryption";
 
 export async function GET(req: NextRequest) {
@@ -98,14 +98,14 @@ export async function GET(req: NextRequest) {
           );
 
           // 4. Send email if account connected, otherwise save draft
-          if (campaign.emailAccount && campaign.emailAccount.gmailAppPassword) {
-            const { messageId } = await sendGmail({
+          if (campaign.emailAccount && (campaign.emailAccount.gmailAppPassword || campaign.emailAccount.smtpPassword)) {
+            const info = await sendEmail({
+              account: campaign.emailAccount,
               to: sponsor.contactEmail,
               subject: pitch.subject,
-              body: pitch.body,
-              encryptedRefreshToken: campaign.emailAccount.gmailAppPassword,
-              senderEmail: campaign.emailAccount.emailAddress,
+              html: pitch.body,
             });
+            const messageId = (info as any)?.messageId || `msg-${Date.now()}`;
 
             // Update outreach to SENT
             await db.outreach.update({

@@ -93,11 +93,112 @@ export default function AIProposalPage() {
 
   function downloadPDF() {
     setPrinting(true);
-    setTimeout(() => {
-      window.print();
+    try {
+      const html = proposalToHtml(proposal, form);
+      const win = window.open("", "_blank");
+      if (!win) { toast.error("Pop-up blocked — allow pop-ups and try again"); setPrinting(false); return; }
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+      setTimeout(() => { win.print(); setPrinting(false); }, 400);
+    } catch {
       setPrinting(false);
-    }, 100);
+      toast.error("Failed to open print preview");
+    }
   }
+
+  function proposalToHtml(text: string, f: ProposalForm): string {
+    const lines = text.split("\n");
+    const htmlLines: string[] = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      const next = lines[i + 1] ?? "";
+      if (next.match(/^={3,}/)) {
+        htmlLines.push(`<h1>${esc(line)}</h1>`);
+        i += 2; continue;
+      }
+      if (next.match(/^-{3,}/)) {
+        htmlLines.push(`<h2>${esc(line)}</h2>`);
+        i += 2; continue;
+      }
+      if (line.match(/^={3,}/) || line.match(/^-{3,}/)) { i++; continue; }
+      if (line.match(/^[•\-\*]\s/)) {
+        htmlLines.push(`<li>${fmt(line.replace(/^[•\-\*]\s/, ""))}</li>`);
+        i++; continue;
+      }
+      if (line.trim() === "") { htmlLines.push("<br>"); i++; continue; }
+      htmlLines.push(`<p>${fmt(line)}</p>`);
+      i++;
+    }
+
+    const body = htmlLines.join("\n")
+      .replace(/(<li>[\s\S]*?<\/li>)(\s*<li>)/g, "$1$2")
+      .replace(/(<li>[\s\S]*?<\/li>\n?)+/g, m => `<ul>${m}</ul>`);
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${f.festName} — Sponsorship Proposal</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Georgia', serif; font-size: 13pt; color: #1a1a1a; background: #fff; padding: 0; }
+  .page { max-width: 210mm; margin: 0 auto; padding: 18mm 20mm; }
+
+  /* Cover banner */
+  .cover { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #0e7490 100%); color: #fff; padding: 48px 40px 40px; border-radius: 0 0 24px 24px; margin-bottom: 36px; }
+  .cover-tag { font-size: 9pt; font-family: 'Arial', sans-serif; letter-spacing: 3px; text-transform: uppercase; color: #7dd3fc; margin-bottom: 10px; }
+  .cover-title { font-size: 30pt; font-weight: bold; line-height: 1.15; margin-bottom: 6px; }
+  .cover-sub { font-size: 13pt; color: #bae6fd; margin-bottom: 24px; }
+  .cover-meta { display: flex; gap: 32px; flex-wrap: wrap; }
+  .cover-meta span { font-size: 10pt; font-family: 'Arial', sans-serif; color: #e0f2fe; }
+  .cover-meta strong { display: block; color: #fff; font-size: 11pt; }
+
+  h1 { font-size: 15pt; font-family: 'Arial', sans-serif; font-weight: 700; color: #0e7490; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #0e7490; padding-bottom: 4px; margin: 28px 0 12px; }
+  h2 { font-size: 12pt; font-family: 'Arial', sans-serif; font-weight: 600; color: #1e3a5f; margin: 18px 0 8px; }
+  p { margin-bottom: 8px; line-height: 1.7; }
+  ul { margin: 6px 0 10px 20px; }
+  li { margin-bottom: 5px; line-height: 1.6; }
+  strong { color: #1e3a5f; }
+  br { display: block; margin: 4px 0; content: ''; }
+
+  .footer { margin-top: 48px; border-top: 1px solid #e2e8f0; padding-top: 16px; font-family: 'Arial', sans-serif; font-size: 9pt; color: #64748b; display: flex; justify-content: space-between; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { padding: 0; }
+    .cover { border-radius: 0; }
+    @page { margin: 12mm 0; size: A4; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="cover">
+    <div class="cover-tag">Sponsorship Proposal</div>
+    <div class="cover-title">${esc(f.festName)}</div>
+    <div class="cover-sub">${esc(f.theme)} &nbsp;·&nbsp; ${esc(f.edition)}</div>
+    <div class="cover-meta">
+      <span><strong>${esc(f.college)}</strong>College</span>
+      <span><strong>${esc(f.city)}</strong>Location</span>
+      <span><strong>${esc(f.dates)}</strong>Dates</span>
+      <span><strong>${esc(f.footfall)}+</strong>Attendees</span>
+      <span><strong>${esc(f.socialReach)}+</strong>Social Reach</span>
+    </div>
+  </div>
+  ${body}
+  <div class="footer">
+    <span>📧 ${esc(f.contactEmail)} &nbsp;·&nbsp; 📞 ${esc(f.contactPhone)}</span>
+    <span>${esc(f.contactName)} &nbsp;·&nbsp; ${esc(f.festName)} Sponsorship Committee</span>
+  </div>
+</div>
+</body>
+</html>`;
+  }
+
+  function esc(s: string) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function fmt(s: string) { return esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>"); }
 
   const inputClass = "w-full bg-background border border-border text-foreground placeholder-foreground-muted rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-400 transition-all";
   const labelClass = "block text-xs font-semibold text-foreground-secondary uppercase tracking-wider mb-1.5";

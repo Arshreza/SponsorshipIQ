@@ -147,6 +147,8 @@ export async function GET(req: NextRequest) {
             });
             const messageId = (info as any)?.messageId || `msg-${Date.now()}`;
 
+            const sentAt = new Date();
+
             // Update outreach to SENT
             await db.outreach.update({
               where: { id: outreach.id },
@@ -154,11 +156,33 @@ export async function GET(req: NextRequest) {
                 subject: pitch.subject,
                 body: pitch.body,
                 status: "SENT",
-                sentAt: new Date(),
+                sentAt,
                 messageId,
-                generatedAt: new Date(),
+                generatedAt: sentAt,
               },
             });
+
+            // Mirror into InboxMessage for unified inbox
+            try {
+              await (db as any).inboxMessage.upsert({
+                where: { emailAccountId_messageId: { emailAccountId: campaign.emailAccount.id, messageId } },
+                create: {
+                  userId: campaign.userId,
+                  emailAccountId: campaign.emailAccount.id,
+                  outreachId: outreach.id,
+                  messageId,
+                  direction: "SENT",
+                  fromEmail: campaign.emailAccount.emailAddress,
+                  fromName: campaign.emailAccount.displayName || null,
+                  toEmail: sponsor.contactEmail,
+                  subject: pitch.subject,
+                  bodyText: pitch.body?.replace(/<[^>]+>/g, " ").trim() || null,
+                  isRead: true,
+                  receivedAt: sentAt,
+                },
+                update: {},
+              });
+            } catch { /* non-critical */ }
 
             // Increment campaign stats
             await db.campaign.update({

@@ -12,6 +12,7 @@ const navItems = [
   { href: "/dashboard/followups",          icon: "📋", label: "Follow-ups",        exact: false },
   
   { href: "/dashboard/campaigns",          icon: "📧", label: "Email Campaigns",   exact: false },
+  { href: "/dashboard/inbox",              icon: "📬", label: "Unified Inbox",      exact: false },
   { href: "/dashboard/ai-email",           icon: "🤖", label: "AI Pitch Gen",      exact: false },
   { href: "/dashboard/ai-proposal",        icon: "📄", label: "AI Proposal PDF",   exact: false },
   
@@ -63,7 +64,7 @@ export function Sidebar() {
         ))}
 
         <p className="text-[10px] font-bold text-sidebar-fg-muted uppercase tracking-widest px-3 pb-2 pt-4">📧 Outreach</p>
-        {navItems.slice(4, 7).map((item) => (
+        {navItems.slice(4, 8).map((item) => (
           <Link
             key={item.href}
             href={item.href}
@@ -83,7 +84,7 @@ export function Sidebar() {
         ))}
 
         <p className="text-[10px] font-bold text-sidebar-fg-muted uppercase tracking-widest px-3 pb-2 pt-4">⚙️ Settings</p>
-        {navItems.slice(7).map((item) => (
+        {navItems.slice(8).map((item) => (
           <Link
             key={item.href}
             href={item.href}

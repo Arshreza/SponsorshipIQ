@@ -32,6 +32,7 @@ model User {
   sponsors              Sponsor[]
   campaigns             Campaign[]
   globalSettings        GlobalSettings?
+  inboxMessages         InboxMessage[]
 }
 
 model Account {
@@ -153,9 +154,10 @@ model EmailAccount {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  campaigns Campaign[]
-  outreaches Outreach[]
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns     Campaign[]
+  outreaches    Outreach[]
+  inboxMessages InboxMessage[]
 }
 
 enum EmailProvider {
@@ -307,9 +309,10 @@ model Outreach {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  campaign     Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  sponsor      Sponsor       @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
-  emailAccount EmailAccount? @relation(fields: [emailAccountId], references: [id])
+  campaign      Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sponsor       Sponsor        @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  emailAccount  EmailAccount?  @relation(fields: [emailAccountId], references: [id])
+  inboxMessages InboxMessage[]
 
   @@unique([campaignId, sponsorId])
   @@index([campaignId])
@@ -336,6 +339,36 @@ enum ReplyCategory {
   OUT_OF_OFFICE
   CONVERTED
   OTHER
+}
+
+// ==========================================
+// UNIFIED INBOX
+// ==========================================
+
+model InboxMessage {
+  id             String   @id @default(cuid())
+  userId         String
+  emailAccountId String
+  outreachId     String?  // linked outreach if this is a matched reply
+  messageId      String   // RFC 2822 Message-ID header value
+  inReplyTo      String?  // In-Reply-To header (links to sent messageId)
+  direction      String   // "SENT" | "RECEIVED"
+  fromEmail      String
+  fromName       String?
+  toEmail        String
+  subject        String?
+  bodyText       String?  @db.Text
+  isRead         Boolean  @default(false)
+  receivedAt     DateTime
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailAccount EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  outreach     Outreach?    @relation(fields: [outreachId], references: [id])
+
+  @@unique([emailAccountId, messageId])
+  @@index([userId, direction])
+  @@index([isRead])
 }
 
 // ==========================================

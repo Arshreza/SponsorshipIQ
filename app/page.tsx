@@ -67,7 +67,7 @@ export default function HomePage() {
         </h1>
 
         <p className="text-lg sm:text-xl text-white/50 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Stop copy-pasting cold emails. SponsorshipIQ uses Claude AI to write
+          Stop copy-pasting cold emails. SponsorshipIQ uses AI to write
           hyper-personalized pitches for each brand — and tracks every response in
           a pipeline that survives committee handovers.
         </p>
@@ -132,7 +132,7 @@ export default function HomePage() {
               step: "03",
               icon: "🤖",
               title: "AI generates pitches",
-              desc: "Claude researches each brand and writes a pitch that speaks to their specific marketing goals.",
+              desc: "AI researches each brand and writes a pitch that speaks to their specific marketing goals.",
             },
             {
               step: "04",
@@ -174,8 +174,8 @@ export default function HomePage() {
             {
               emoji: "✨",
               title: "AI Pitch Generation",
-              desc: "Claude writes context-aware pitches per brand — referencing their real marketing campaigns, products, and CSR initiatives.",
-              tag: "Powered by Claude",
+              desc: "AI writes context-aware pitches per brand — referencing their real marketing campaigns, products, and CSR initiatives.",
+              tag: "Powered by AI",
             },
             {
               emoji: "📬",
@@ -234,7 +234,7 @@ export default function HomePage() {
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             {[
-              "Next.js 15", "TypeScript", "Claude AI",
+              "Next.js 15", "TypeScript", "Groq AI",
               "PostgreSQL", "Prisma ORM", "BullMQ",
               "Redis", "Gmail API", "Tailwind CSS v4",
               "NextAuth v5", "Vercel", "Neon DB",

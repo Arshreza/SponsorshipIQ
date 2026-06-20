@@ -17,14 +17,27 @@ interface EmailAccount {
   displayName: string | null;
 }
 
+interface Sponsor {
+  id: string;
+  companyName: string;
+  contactEmail: string;
+  contactName: string | null;
+  industry: string | null;
+}
+
 export default function NewCampaignPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+
   // Dependencies
   const [lists, setLists] = useState<SponsorList[]>([]);
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+
+  // Sponsor selection
+  const [listSponsors, setListSponsors] = useState<Sponsor[]>([]);
+  const [selectedSponsorIds, setSelectedSponsorIds] = useState<Set<string>>(new Set());
+  const [loadingSponsors, setLoadingSponsors] = useState(false);
 
   // Form state
   const [name, setName] = useState("");
@@ -46,6 +59,7 @@ export default function NewCampaignPage() {
           
           if (data.sponsorLists?.length > 0) {
             setSelectedList(data.sponsorLists[0].id);
+            loadSponsorsForList(data.sponsorLists[0].id);
           }
           if (data.emailAccounts?.length > 0) {
             setSelectedAccount(data.emailAccounts[0].id);
@@ -62,6 +76,39 @@ export default function NewCampaignPage() {
     loadDependencies();
   }, []);
 
+  async function loadSponsorsForList(listId: string) {
+    if (!listId) { setListSponsors([]); setSelectedSponsorIds(new Set()); return; }
+    setLoadingSponsors(true);
+    try {
+      const res = await fetch(`/api/sponsors/by-list?listId=${listId}`);
+      if (res.ok) {
+        const data: Sponsor[] = await res.json();
+        setListSponsors(data);
+        setSelectedSponsorIds(new Set(data.map(s => s.id)));
+      }
+    } catch {
+      // silent
+    } finally {
+      setLoadingSponsors(false);
+    }
+  }
+
+  function toggleSponsor(id: string) {
+    setSelectedSponsorIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (selectedSponsorIds.size === listSponsors.length) {
+      setSelectedSponsorIds(new Set());
+    } else {
+      setSelectedSponsorIds(new Set(listSponsors.map(s => s.id)));
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
@@ -70,6 +117,10 @@ export default function NewCampaignPage() {
     }
     if (!selectedList) {
       toast.error("Please select a target sponsor list");
+      return;
+    }
+    if (selectedSponsorIds.size === 0) {
+      toast.error("Select at least one sponsor to target");
       return;
     }
 
@@ -86,6 +137,7 @@ export default function NewCampaignPage() {
           toneOfVoice: tone,
           emailWordLimit: wordLimit,
           subjectTemplate,
+          sponsorIds: Array.from(selectedSponsorIds),
         }),
       });
 
@@ -161,7 +213,10 @@ export default function NewCampaignPage() {
             ) : (
               <select
                 value={selectedList}
-                onChange={e => setSelectedList(e.target.value)}
+                onChange={e => {
+                  setSelectedList(e.target.value);
+                  loadSponsorsForList(e.target.value);
+                }}
                 className={inputClass}
               >
                 {lists.map(l => (
@@ -192,6 +247,61 @@ export default function NewCampaignPage() {
             )}
           </div>
         </div>
+
+        {/* Sponsor Checklist */}
+        {selectedList && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className={labelClass}>
+                Target Sponsors
+                <span className="ml-2 text-brand-400 normal-case font-normal">
+                  {selectedSponsorIds.size} / {listSponsors.length} selected
+                </span>
+              </label>
+              {listSponsors.length > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="text-[10px] font-semibold text-brand-400 hover:text-brand-300 transition-colors"
+                >
+                  {selectedSponsorIds.size === listSponsors.length ? "Deselect All" : "Select All"}
+                </button>
+              )}
+            </div>
+
+            {loadingSponsors ? (
+              <div className="flex items-center gap-2 text-xs text-foreground-muted py-3">
+                <span className="w-4 h-4 border border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
+                Loading sponsors…
+              </div>
+            ) : listSponsors.length === 0 ? (
+              <p className="text-xs text-amber-400 py-2">No sponsors in this list yet. Add sponsors first.</p>
+            ) : (
+              <div className="border border-border rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+                {listSponsors.map((s, i) => (
+                  <label
+                    key={s.id}
+                    className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-background transition-colors ${i !== 0 ? "border-t border-border/50" : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedSponsorIds.has(s.id)}
+                      onChange={() => toggleSponsor(s.id)}
+                      className="accent-brand-500 w-4 h-4 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-foreground truncate">{s.companyName}</div>
+                      <div className="text-[10px] text-foreground-muted truncate">
+                        {s.contactName ? `${s.contactName} · ` : ""}{s.contactEmail}
+                        {s.industry ? ` · ${s.industry}` : ""}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Template Subject & Word Limit */}
         <div className="grid sm:grid-cols-3 gap-4">

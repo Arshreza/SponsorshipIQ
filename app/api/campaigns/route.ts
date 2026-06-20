@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const { name, sponsorListId, emailAccountId, guidelines, toneOfVoice, emailWordLimit, subjectTemplate } = await req.json();
+    const { name, sponsorListId, emailAccountId, guidelines, toneOfVoice, emailWordLimit, subjectTemplate, sponsorIds } = await req.json();
 
     if (!name || !sponsorListId) {
       return NextResponse.json({ error: "Campaign name and Sponsor List are required" }, { status: 400 });
@@ -62,9 +62,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Load sponsor list entries to create outreach pipelines
+    // Load sponsor list entries — filter by selected sponsorIds if provided
     const entries = await db.sponsorListEntry.findMany({
-      where: { sponsorListId },
+      where: {
+        sponsorListId,
+        ...(sponsorIds?.length ? { sponsorId: { in: sponsorIds } } : {}),
+      },
     });
 
     // Create outreach entries sequentially to avoid mock DB issues

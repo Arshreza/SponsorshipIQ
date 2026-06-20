@@ -38,6 +38,7 @@ interface Sponsor {
   city: string | null;
   phone: string | null;
   notes: string | null;
+  description: string | null;
   status: string;
   amount: number;
   assignedTo: string | null;
@@ -51,6 +52,9 @@ export function SponsorDetailClient({ sponsor: initialSponsor }: { sponsor: Spon
   const [editNotes, setEditNotes] = useState(false);
   const [notes, setNotes] = useState(initialSponsor.notes || "");
   const [savingNotes, setSavingNotes] = useState(false);
+  const [editDescription, setEditDescription] = useState(false);
+  const [description, setDescription] = useState(initialSponsor.description || "");
+  const [savingDescription, setSavingDescription] = useState(false);
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
   const [researching, setResearching] = useState(false);
 
@@ -75,6 +79,28 @@ export function SponsorDetailClient({ sponsor: initialSponsor }: { sponsor: Spon
       toast.error("Network error");
     } finally {
       setSavingNotes(false);
+    }
+  }
+
+  async function saveDescription() {
+    setSavingDescription(true);
+    try {
+      const res = await fetch(`/api/sponsors/${sponsor.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description }),
+      });
+      if (res.ok) {
+        setSponsor(s => ({ ...s, description }));
+        setEditDescription(false);
+        toast.success("AI context saved!");
+      } else {
+        toast.error("Failed to save context");
+      }
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setSavingDescription(false);
     }
   }
 
@@ -167,6 +193,42 @@ export function SponsorDetailClient({ sponsor: initialSponsor }: { sponsor: Spon
             </p>
           )}
         </div>
+      </div>
+
+      {/* AI Email Context */}
+      <div className="bg-background-secondary border border-border rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-xs font-bold text-foreground uppercase tracking-wider">✍️ AI Email Context</h2>
+            <p className="text-xs text-foreground-muted mt-0.5">This context guides the AI when writing outreach emails for this sponsor.</p>
+          </div>
+          {!editDescription && (
+            <button onClick={() => setEditDescription(true)} className="text-xs text-brand-400 hover:text-brand-300 font-semibold transition-colors">
+              Edit
+            </button>
+          )}
+        </div>
+        {editDescription ? (
+          <div className="space-y-3">
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              rows={4}
+              placeholder="e.g. This company targets college students and recently ran a campus ambassador program — focus on hackathon sponsorship angle"
+              className={inputClass}
+            />
+            <div className="flex gap-2">
+              <button onClick={() => { setEditDescription(false); setDescription(sponsor.description || ""); }} className="flex-1 text-xs text-foreground-muted border border-border rounded-xl py-2 hover:bg-background transition-all font-semibold">Cancel</button>
+              <button onClick={saveDescription} disabled={savingDescription} className="flex-1 text-xs btn-shine gradient-brand text-white rounded-xl py-2 font-bold disabled:opacity-50">
+                {savingDescription ? "Saving…" : "Save Context"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className={`text-sm ${sponsor.description ? "text-foreground" : "text-foreground-muted italic"}`}>
+            {sponsor.description || "No AI context set. Click Edit to add context that will personalize outreach emails for this sponsor."}
+          </p>
+        )}
       </div>
 
       {/* AI Research */}

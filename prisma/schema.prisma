@@ -198,6 +198,7 @@ model Sponsor {
   city           String?
   phone          String?
   notes          String?  @db.Text
+  description    String?  @db.Text // User-written context to guide AI email generation
   // CRM pipeline tracking
   status         String   @default("CONTACTED") // CONTACTED, INTERESTED, CONFIRMED, REJECTED
   amount         Int      @default(0)

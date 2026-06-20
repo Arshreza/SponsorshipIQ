@@ -114,15 +114,20 @@ export default function CampaignDetailPage() {
         <Link href="/dashboard/campaigns" className="text-xs text-brand-400 hover:text-brand-300 font-semibold flex items-center gap-1 mb-2">
           ← Back to Campaigns
         </Link>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-bold text-foreground">{campaign.name}</h1>
-          <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
-            campaign.status === "ACTIVE" ? "bg-green-500/15 text-green-400 border-green-500/30" :
-            campaign.status === "PAUSED" ? "bg-purple-500/15 text-purple-400 border-purple-500/30" :
-            "bg-gray-500/15 text-gray-400 border-gray-500/30"
-          }`}>
-            {campaign.status}
-          </span>
+          <div className="flex items-center gap-3 shrink-0">
+            <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+              campaign.status === "ACTIVE" ? "bg-green-500/15 text-green-400 border-green-500/30" :
+              campaign.status === "PAUSED" ? "bg-purple-500/15 text-purple-400 border-purple-500/30" :
+              "bg-gray-500/15 text-gray-400 border-gray-500/30"
+            }`}>
+              {campaign.status}
+            </span>
+            <Link href={`/dashboard/campaigns/${id}/edit`} className="text-xs font-bold px-3 py-1.5 border border-border hover:bg-background-secondary text-foreground-muted rounded-xl transition-all">
+              Edit
+            </Link>
+          </div>
         </div>
       </div>
 

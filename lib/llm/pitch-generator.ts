@@ -18,6 +18,7 @@ interface PitchContext {
   website?: string | null;
   contactName?: string | null;
   aiResearch?: string | null;
+  description?: string | null;
 
   // Sender info
   senderName?: string | null;
@@ -87,7 +88,8 @@ TARGET BRAND:
 - Industry: ${ctx.industry || "Not specified"}
 - Website: ${ctx.website || "Not available"}
 ${ctx.contactName ? `- Contact: ${ctx.contactName}` : ""}
-${ctx.aiResearch ? `- Brand Research: ${ctx.aiResearch}` : ""}
+${ctx.description ? `- Sponsor Context (use this to personalize the email): ${ctx.description}` : ""}
+${ctx.aiResearch ? `- AI Brand Research: ${ctx.aiResearch}` : ""}
 
 SENDER:
 - Name: ${ctx.senderName || "Sponsorship Team"}
@@ -323,7 +325,8 @@ TARGET BRAND:
 - Industry: ${ctx.industry || "Not specified"}
 - Website: ${ctx.website || "Not available"}
 ${ctx.contactName ? `- Contact: ${ctx.contactName}` : ""}
-${ctx.aiResearch ? `- Brand Research: ${ctx.aiResearch}` : ""}
+${ctx.description ? `- Sponsor Context (use this to personalize the email): ${ctx.description}` : ""}
+${ctx.aiResearch ? `- AI Brand Research: ${ctx.aiResearch}` : ""}
 
 SENDER:
 - Name: ${ctx.senderName || "Sponsorship Team"}

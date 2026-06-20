@@ -258,6 +258,12 @@ export default function CampaignsPage() {
                     Created {new Date(c.createdAt).toLocaleDateString()}
                   </div>
                   <div className="flex gap-2">
+                    <Link
+                      href={`/dashboard/campaigns/${c.id}/edit`}
+                      className="text-xs font-bold px-3 py-2 border border-border hover:bg-background text-foreground-muted rounded-xl transition-all"
+                    >
+                      Edit
+                    </Link>
                     {c.status === "ACTIVE" ? (
                       <>
                         <button

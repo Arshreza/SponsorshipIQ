@@ -100,6 +100,7 @@ export async function GET(req: NextRequest) {
               industry: sponsor.industry,
               website: sponsor.website,
               contactName: sponsor.contactName,
+              description: sponsor.description,
               aiResearch: sponsor.aiResearch,
               senderName: campaign.emailAccount?.displayName || "Sponsorship Committee",
               senderEmail: campaign.emailAccount?.emailAddress || "coordinator@sponsorshipiq.com",

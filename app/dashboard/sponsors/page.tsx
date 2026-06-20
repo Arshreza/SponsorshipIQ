@@ -44,6 +44,7 @@ type SponsorForm = {
   assignedTo: string;
   lastContact: string;
   notes: string;
+  description: string;
 };
 
 const emptyForm: SponsorForm = {
@@ -57,6 +58,7 @@ const emptyForm: SponsorForm = {
   assignedTo: MEMBERS[0],
   lastContact: new Date().toISOString().slice(0, 10),
   notes: "",
+  description: "",
 };
 
 export default function SponsorsPage() {
@@ -117,6 +119,7 @@ export default function SponsorsPage() {
       assignedTo: s.assignedTo || MEMBERS[0],
       lastContact: s.lastContact || new Date().toISOString().slice(0, 10),
       notes: s.notes || "",
+      description: s.description || "",
     });
     setEditId(s.id);
     setShowAdd(true);
@@ -138,6 +141,7 @@ export default function SponsorsPage() {
         phone: form.phone || null,
         industry: form.industry || null,
         notes: form.notes || null,
+        description: form.description || null,
         status: form.status,
         amount: form.amount,
         assignedTo: form.assignedTo || null,
@@ -370,6 +374,11 @@ export default function SponsorsPage() {
               <div className="sm:col-span-2">
                 <label className={labelClass}>Notes</label>
                 <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={3} placeholder="Follow-up notes, interests, next steps…" className={inputClass} />
+              </div>
+              <div className="sm:col-span-2">
+                <label className={labelClass}>AI Email Context</label>
+                <textarea value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} rows={3} placeholder="e.g. This company targets college students and recently ran a campus ambassador program — focus on hackathon sponsorship angle" className={inputClass} />
+                <p className="mt-1 text-xs text-foreground-muted">This context is passed to the AI when generating outreach emails for this sponsor.</p>
               </div>
             </div>
 

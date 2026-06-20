@@ -82,7 +82,12 @@ export default function NewCampaignPage() {
     try {
       const res = await fetch(`/api/sponsors/by-list?listId=${listId}`);
       if (res.ok) {
-        const data: Sponsor[] = await res.json();
+        let data: Sponsor[] = await res.json();
+        // If list is empty, fall back to all user's sponsors
+        if (data.length === 0) {
+          const fallback = await fetch("/api/sponsors");
+          if (fallback.ok) data = await fallback.json();
+        }
         setListSponsors(data);
         setSelectedSponsorIds(new Set(data.map(s => s.id)));
       }
@@ -275,7 +280,7 @@ export default function NewCampaignPage() {
                 Loading sponsors…
               </div>
             ) : listSponsors.length === 0 ? (
-              <p className="text-xs text-amber-400 py-2">No sponsors in this list yet. Add sponsors first.</p>
+              <p className="text-xs text-amber-400 py-2">No sponsors found. <a href="/dashboard/sponsors" className="text-brand-400 hover:underline font-bold">Add sponsors first →</a></p>
             ) : (
               <div className="border border-border rounded-xl overflow-hidden max-h-56 overflow-y-auto">
                 {listSponsors.map((s, i) => (

@@ -53,10 +53,11 @@ export async function syncInboxForAccount(account: EmailAccountRecord): Promise<
       since.setDate(since.getDate() - 45);
 
       const uids = await client.search({ since });
-      if (uids.length === 0) { lock.release(); return 0; }
+      const uidList = uids === false ? [] : (uids as number[]);
+      if (uidList.length === 0) { lock.release(); return 0; }
 
       // Fetch only the most recent 100
-      const fetchUids = uids.slice(-100);
+      const fetchUids = uidList.slice(-100);
 
       // Get all outreach messageIds for this account to match replies
       const outreaches = await db.outreach.findMany({
@@ -84,7 +85,8 @@ export async function syncInboxForAccount(account: EmailAccountRecord): Promise<
           const msgId = (envelope as any).messageId as string | undefined;
           if (!msgId) continue;
 
-          const inReplyTo = msg.headers?.get("in-reply-to") || "";
+          const headersMap = msg.headers as Map<string, string> | undefined;
+          const inReplyTo = headersMap?.get?.("in-reply-to") || "";
           const fromAddr = envelope.from?.[0]?.address || "";
           const fromName = envelope.from?.[0]?.name || "";
           const toAddr = envelope.to?.[0]?.address || "";

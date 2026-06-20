@@ -31,6 +31,7 @@ interface Sponsor {
   assignedTo: string | null;
   lastContact: string | null;
   notes: string | null;
+  description: string | null;
 }
 
 type SponsorForm = {
@@ -164,12 +165,12 @@ export default function SponsorsPage() {
       }
 
       if (res.ok) {
-        toast.success(editId ? "Sponsor updated!" : "Sponsor added!");
+        toast.success(editId ? "Lead updated!" : "Lead added!");
         closeModal();
         await loadSponsors();
       } else {
         const err = await res.json();
-        toast.error(err.error || "Failed to save sponsor");
+        toast.error(err.error || "Failed to save lead");
       }
     } catch {
       toast.error("Network error. Please try again.");
@@ -179,14 +180,14 @@ export default function SponsorsPage() {
   }
 
   async function deleteSponsor(id: string) {
-    if (!confirm("Remove this sponsor?")) return;
+    if (!confirm("Remove this lead?")) return;
     try {
       const res = await fetch(`/api/sponsors/${id}`, { method: "DELETE" });
       if (res.ok) {
-        toast.success("Sponsor removed");
+        toast.success("Lead removed");
         setSponsors(prev => prev.filter(s => s.id !== id));
       } else {
-        toast.error("Failed to delete sponsor");
+        toast.error("Failed to delete lead");
       }
     } catch {
       toast.error("Network error");
@@ -201,7 +202,7 @@ export default function SponsorsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">🏢 Sponsors</h1>
+          <h1 className="text-2xl font-bold text-foreground">🏢 Leads</h1>
           <p className="text-foreground-muted text-sm mt-1">
             {loading ? "Loading…" : `${sponsors.length} companies tracked · ${sponsors.filter(s => s.status === "CONFIRMED").length} confirmed`}
           </p>
@@ -210,7 +211,7 @@ export default function SponsorsPage() {
           onClick={openAdd}
           className="btn-shine gradient-brand text-white px-5 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-brand-500/25 hover:scale-105 transition-all"
         >
-          + Add Sponsor
+          + Add Lead
         </button>
       </div>
 
@@ -326,7 +327,7 @@ export default function SponsorsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-background-secondary border border-border rounded-2xl p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-foreground">{editId ? "Edit Sponsor" : "Add Sponsor"}</h2>
+              <h2 className="text-lg font-bold text-foreground">{editId ? "Edit Lead" : "Add Lead"}</h2>
               <button onClick={closeModal} className="text-foreground-muted hover:text-foreground text-xl transition-colors">✕</button>
             </div>
 
@@ -392,7 +393,7 @@ export default function SponsorsPage() {
                 {saving ? (
                   <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving…</>
                 ) : (
-                  editId ? "Save Changes" : "Add Sponsor"
+                  editId ? "Save Changes" : "Add Lead"
                 )}
               </button>
             </div>

@@ -110,7 +110,7 @@ export function SponsorDetailClient({ sponsor: initialSponsor }: { sponsor: Spon
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Back link */}
       <Link href="/dashboard/sponsors" className="inline-flex items-center gap-2 text-sm text-foreground-muted hover:text-foreground transition-colors">
-        ← Back to Sponsors
+        ← Back to Leads
       </Link>
 
       {/* Header */}

@@ -7,7 +7,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const [sponsorLists, emailAccounts] = await Promise.all([
+    const [sponsorLists, emailAccounts, festProfile] = await Promise.all([
       db.sponsorList.findMany({
         where: { userId: session.user.id },
         orderBy: { createdAt: "desc" },
@@ -15,6 +15,10 @@ export async function GET() {
       db.emailAccount.findMany({
         where: { userId: session.user.id, status: "CONNECTED" },
         orderBy: { createdAt: "desc" },
+      }),
+      db.festProfile.findFirst({
+        where: { userId: session.user.id, isActive: true },
+        orderBy: { updatedAt: "desc" },
       }),
     ]);
 
@@ -54,6 +58,7 @@ export async function GET() {
     return NextResponse.json({
       sponsorLists: finalLists,
       emailAccounts,
+      festProfile: festProfile || null,
     });
   } catch (err) {
     console.error("[Campaign dependencies GET]", err);

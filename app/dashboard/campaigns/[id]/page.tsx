@@ -48,8 +48,12 @@ export default function CampaignDetailPage() {
   const [outreaches, setOutreaches] = useState<Outreach[]>([]);
   const [loading, setLoading] = useState(true);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("ALL");
+  const [showAddLead, setShowAddLead] = useState(false);
+  const [allLeads, setAllLeads] = useState<{ id: string; companyName: string; contactEmail: string; contactName: string | null }[]>([]);
+  const [addingLeadId, setAddingLeadId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,6 +74,58 @@ export default function CampaignDetailPage() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  async function loadAllLeads() {
+    const res = await fetch("/api/sponsors");
+    if (res.ok) setAllLeads(await res.json());
+  }
+
+  async function addLead(sponsorId: string) {
+    setAddingLeadId(sponsorId);
+    try {
+      const res = await fetch(`/api/campaigns/${id}/outreaches`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sponsorId }),
+      });
+      if (res.ok) {
+        toast.success("Lead added to campaign!");
+        await load();
+        setShowAddLead(false);
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to add lead");
+      }
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setAddingLeadId(null);
+    }
+  }
+
+  async function removeLead(outreachId: string) {
+    if (!confirm("Remove this lead from the campaign?")) return;
+    setRemovingId(outreachId);
+    try {
+      const res = await fetch(`/api/campaigns/${id}/outreaches`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outreachId }),
+      });
+      if (res.ok) {
+        toast.success("Lead removed from campaign.");
+        setOutreaches(prev => prev.filter(o => o.id !== outreachId));
+        setCampaign(prev => prev ? { ...prev, totalSponsors: prev.totalSponsors - 1 } : prev);
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to remove lead");
+      }
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   async function retryOutreach(outreachId: string) {
     setRetryingId(outreachId);
@@ -163,6 +219,16 @@ export default function CampaignDetailPage() {
         </div>
       )}
 
+      {/* Add Lead button */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => { setShowAddLead(true); loadAllLeads(); }}
+          className="text-xs font-bold px-4 py-2 btn-shine gradient-brand text-white rounded-xl shadow shadow-brand-500/20 transition-all"
+        >
+          + Add Lead
+        </button>
+      </div>
+
       {/* Filter tabs */}
       <div className="flex gap-2 flex-wrap">
         {["ALL", "PENDING", "DRAFTED", "SENT", "REPLIED", "CONVERTED", "FAILED"].map(s => (
@@ -229,6 +295,15 @@ export default function CampaignDetailPage() {
                           {retryingId === o.id ? "Retrying…" : "Retry"}
                         </button>
                       )}
+                      {["PENDING", "DRAFTED", "FAILED"].includes(o.status) && (
+                        <button
+                          disabled={removingId === o.id}
+                          onClick={() => removeLead(o.id)}
+                          className="text-xs font-bold px-3 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50"
+                        >
+                          {removingId === o.id ? "…" : "Remove"}
+                        </button>
+                      )}
                       {(o.body || o.subject) && (
                         <button
                           onClick={() => setExpandedId(isExpanded ? null : o.id)}
@@ -251,6 +326,46 @@ export default function CampaignDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Add Lead modal */}
+      {showAddLead && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAddLead(false)}>
+          <div className="bg-background-secondary border border-border rounded-2xl p-6 w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-foreground">Add Lead to Campaign</h2>
+              <button onClick={() => setShowAddLead(false)} className="text-foreground-muted hover:text-foreground text-xl leading-none">×</button>
+            </div>
+            <p className="text-xs text-foreground-muted mb-4">Select a lead to add. Only leads not already in this campaign are shown.</p>
+            {allLeads.length === 0 ? (
+              <p className="text-sm text-foreground-muted text-center py-6">No leads available.</p>
+            ) : (
+              <div className="max-h-80 overflow-y-auto space-y-2">
+                {allLeads
+                  .filter(lead => !outreaches.some(o => o.sponsor.id === lead.id))
+                  .map(lead => (
+                    <div key={lead.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-border hover:border-brand-500/30 hover:bg-background transition-all">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{lead.companyName}</p>
+                        <p className="text-xs text-foreground-muted truncate">{lead.contactName ? `${lead.contactName} · ` : ""}{lead.contactEmail}</p>
+                      </div>
+                      <button
+                        onClick={() => addLead(lead.id)}
+                        disabled={addingLeadId === lead.id}
+                        className="text-xs font-bold px-3 py-1.5 shrink-0 btn-shine gradient-brand text-white rounded-xl transition-all disabled:opacity-50"
+                      >
+                        {addingLeadId === lead.id ? "Adding…" : "+ Add"}
+                      </button>
+                    </div>
+                  ))
+                }
+                {allLeads.filter(lead => !outreaches.some(o => o.sponsor.id === lead.id)).length === 0 && (
+                  <p className="text-sm text-foreground-muted text-center py-6">All your leads are already in this campaign.</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

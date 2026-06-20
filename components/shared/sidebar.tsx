@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard",                    icon: "📊", label: "Overview",         exact: true },
-  { href: "/dashboard/sponsors",           icon: "🏢", label: "Sponsors",         exact: false },
+  { href: "/dashboard/sponsors",           icon: "🏢", label: "Leads",            exact: false },
   { href: "/dashboard/money",              icon: "💰", label: "Money Tracker",     exact: false },
   { href: "/dashboard/followups",          icon: "📋", label: "Follow-ups",        exact: false },
   

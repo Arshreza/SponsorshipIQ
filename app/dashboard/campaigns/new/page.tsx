@@ -33,6 +33,7 @@ export default function NewCampaignPage() {
   // Dependencies
   const [lists, setLists] = useState<SponsorList[]>([]);
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [festProfile, setFestProfile] = useState<{ id: string; name: string; college: string | null; city: string | null; eventDates: string | null; festType: string | null } | null>(null);
 
   // Sponsor selection
   const [listSponsors, setListSponsors] = useState<Sponsor[]>([]);
@@ -56,6 +57,7 @@ export default function NewCampaignPage() {
           const data = await res.json();
           setLists(data.sponsorLists || []);
           setAccounts(data.emailAccounts || []);
+          setFestProfile(data.festProfile || null);
           
           if (data.sponsorLists?.length > 0) {
             setSelectedList(data.sponsorLists[0].id);
@@ -193,6 +195,32 @@ export default function NewCampaignPage() {
           To protect sponsor relationships and align with local guidelines, the AI agent is hardcoded to <strong>never mention financial sponsorship tiers, pricing, or amounts</strong> in the initial cold emails. All emails are strictly designed to secure a calendar booking or initial call.
         </div>
       </div>
+
+      {/* Fest Profile info card */}
+      {festProfile ? (
+        <div className="flex items-center justify-between gap-4 bg-brand-500/5 border border-brand-500/20 rounded-xl px-4 py-3">
+          <div>
+            <p className="text-xs font-bold text-brand-400 uppercase tracking-wider mb-0.5">Using Fest Profile</p>
+            <p className="text-sm font-semibold text-foreground">{festProfile.name}</p>
+            <p className="text-xs text-foreground-muted">
+              {[festProfile.college, festProfile.city, festProfile.eventDates].filter(Boolean).join(" · ")}
+            </p>
+          </div>
+          <Link href="/dashboard/settings/fest" className="text-xs font-bold text-brand-400 hover:text-brand-300 shrink-0 border border-brand-500/30 px-3 py-1.5 rounded-xl transition-colors">
+            Edit Profile
+          </Link>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-4 bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3">
+          <div>
+            <p className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-0.5">No Fest Profile Set</p>
+            <p className="text-xs text-foreground-muted">AI emails will use placeholder fest details. Set up your fest profile for better results.</p>
+          </div>
+          <Link href="/dashboard/settings/fest" className="text-xs font-bold text-amber-400 shrink-0 border border-amber-500/30 px-3 py-1.5 rounded-xl hover:bg-amber-500/10 transition-colors">
+            Set Up Now →
+          </Link>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="bg-background-secondary border border-border rounded-2xl p-6 space-y-5">
         {/* Campaign Name */}

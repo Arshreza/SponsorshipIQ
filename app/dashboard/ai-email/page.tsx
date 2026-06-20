@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 interface FormData {
@@ -13,6 +13,22 @@ interface FormData {
   expectedFootfall: string;
   highlights: string;
   tone: string;
+}
+
+interface EmailAccount {
+  id: string;
+  emailAddress: string;
+  displayName: string | null;
+  status: string;
+}
+
+function parseEmail(raw: string): { subject: string; body: string } {
+  const lines = raw.split("\n");
+  const subjectLine = lines.find(l => l.toLowerCase().startsWith("subject:"));
+  const subject = subjectLine ? subjectLine.replace(/^subject:\s*/i, "").trim() : "";
+  const bodyStart = subjectLine ? lines.indexOf(subjectLine) + 1 : 0;
+  const body = lines.slice(bodyStart).join("\n").replace(/^\s*\n/, "").trim();
+  return { subject, body };
 }
 
 export default function AIEmailPage() {
@@ -32,8 +48,52 @@ export default function AIEmailPage() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings/email")
+      .then(r => r.json())
+      .then(data => {
+        const connected = data.filter((a: EmailAccount) => a.status === "CONNECTED");
+        setEmailAccounts(connected);
+        if (connected.length > 0) setSelectedAccountId(connected[0].id);
+      })
+      .catch(() => {});
+  }, []);
+
   function setField(key: keyof FormData, value: string) {
     setForm(prev => ({ ...prev, [key]: value }));
+  }
+
+  async function sendGeneratedEmail() {
+    if (!recipientEmail.trim()) { toast.error("Enter the recipient's email address"); return; }
+    if (!selectedAccountId) { toast.error("Select a sender email account"); return; }
+    if (!email) { toast.error("Generate an email first"); return; }
+
+    const { subject, body } = parseEmail(email);
+    if (!subject) { toast.error("Could not parse subject from generated email"); return; }
+
+    setSending(true);
+    try {
+      const res = await fetch("/api/ai/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: recipientEmail.trim(), subject, body, emailAccountId: selectedAccountId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Email sent to ${recipientEmail}!`);
+      } else {
+        toast.error(data.error || "Failed to send email");
+      }
+    } catch {
+      toast.error("Network error sending email");
+    } finally {
+      setSending(false);
+    }
   }
 
   async function generateEmail() {
@@ -227,14 +287,53 @@ export default function AIEmailPage() {
           )}
 
           {email && (
-            <div className="flex-1 flex flex-col">
-              <div className="flex-1 bg-background rounded-xl p-4 text-sm text-foreground leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[500px] border border-border">
+            <div className="flex-1 flex flex-col gap-4">
+              <div className="flex-1 bg-background rounded-xl p-4 text-sm text-foreground leading-relaxed whitespace-pre-wrap overflow-y-auto max-h-[360px] border border-border">
                 {email}
               </div>
-              <p className="text-xs text-foreground-muted mt-3 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 bg-green-400 rounded-full" />
-                Review before sending — personalize if needed
-              </p>
+
+              {/* Send directly */}
+              <div className="border-t border-border pt-4 space-y-3">
+                <p className="text-xs font-bold text-foreground uppercase tracking-wider">Send This Email</p>
+                <div>
+                  <label className="block text-[10px] font-semibold text-foreground-muted uppercase tracking-wider mb-1">Recipient Email</label>
+                  <input
+                    type="email"
+                    value={recipientEmail}
+                    onChange={e => setRecipientEmail(e.target.value)}
+                    placeholder="contact@company.com"
+                    className="w-full bg-background border border-border text-foreground placeholder-foreground-muted rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition-all"
+                  />
+                </div>
+                {emailAccounts.length > 0 ? (
+                  <div>
+                    <label className="block text-[10px] font-semibold text-foreground-muted uppercase tracking-wider mb-1">Send From</label>
+                    <select
+                      value={selectedAccountId}
+                      onChange={e => setSelectedAccountId(e.target.value)}
+                      className="w-full bg-background border border-border text-foreground rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/40 transition-all"
+                    >
+                      {emailAccounts.map(a => (
+                        <option key={a.id} value={a.id}>{a.emailAddress}{a.displayName ? ` (${a.displayName})` : ""}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-400">
+                    No email accounts connected.{" "}
+                    <a href="/dashboard/settings/email" className="text-brand-400 hover:underline font-bold">Connect one →</a>
+                  </p>
+                )}
+                <button
+                  onClick={sendGeneratedEmail}
+                  disabled={sending || emailAccounts.length === 0}
+                  className="w-full py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-bold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {sending ? (
+                    <><span className="w-3.5 h-3.5 border border-white/40 border-t-white rounded-full animate-spin" /> Sending…</>
+                  ) : "Send Email →"}
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -31,6 +31,24 @@ export async function GET(req: NextRequest) {
 
     // 2. Process pending outreaches for active campaigns
     for (const campaign of activeCampaigns) {
+      // Reset daily counter if it's a new day
+      if (campaign.emailAccount) {
+        const lastReset = new Date(campaign.emailAccount.lastResetDate);
+        const today = new Date();
+        if (lastReset.toDateString() !== today.toDateString()) {
+          await db.emailAccount.update({
+            where: { id: campaign.emailAccount.id },
+            data: { sentToday: 0, lastResetDate: today },
+          });
+          campaign.emailAccount.sentToday = 0;
+        }
+        // Skip if daily limit reached
+        if (campaign.emailAccount.sentToday >= campaign.emailAccount.dailyLimit) {
+          processed.push({ campaignId: campaign.id, status: "DAILY_LIMIT_REACHED" });
+          continue;
+        }
+      }
+
       // Find pending outreaches for this campaign
       const pendingOutreaches = await db.outreach.findMany({
         where: {

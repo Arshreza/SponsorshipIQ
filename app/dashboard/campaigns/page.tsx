@@ -32,6 +32,7 @@ export default function CampaignsPage() {
   const [emailAccounts, setEmailAccounts] = useState<{ id: string; emailAddress: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const loadCampaigns = useCallback(async () => {
     setLoading(true);
@@ -87,6 +88,29 @@ export default function CampaignsPage() {
       toast.error("Network error executing action");
     } finally {
       setActioningId(null);
+    }
+  }
+
+  async function handleProcessNow(campaignId: string) {
+    setProcessingId(campaignId);
+    try {
+      const res = await fetch("/api/cron/process-outreach");
+      if (res.ok) {
+        const data = await res.json();
+        const sent = data.details?.filter((d: any) => d.status === "SENT").length || 0;
+        const drafted = data.details?.filter((d: any) => d.status === "DRAFTED").length || 0;
+        if (sent > 0) toast.success(`⚡ Sent ${sent} email${sent > 1 ? "s" : ""} successfully!`);
+        else if (drafted > 0) toast.info(`📝 Drafted ${drafted} email${drafted > 1 ? "s" : ""} (no sender connected)`);
+        else toast.info("No pending outreaches to process.");
+        loadCampaigns();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || "Failed to process outreach");
+      }
+    } catch {
+      toast.error("Network error processing outreach");
+    } finally {
+      setProcessingId(null);
     }
   }
 
@@ -192,7 +216,7 @@ export default function CampaignsPage() {
                   </div>
 
                   {/* Stats Grid */}
-                  <div className="grid grid-cols-4 gap-2 bg-background/50 border border-border/50 rounded-xl p-3 mb-6">
+                  <div className="grid grid-cols-4 gap-2 bg-background/50 border border-border/50 rounded-xl p-3 mb-3">
                     <div className="text-center">
                       <div className="text-xs text-foreground-muted">Sponsors</div>
                       <div className="text-sm font-extrabold text-foreground mt-0.5">{c.totalSponsors}</div>
@@ -210,6 +234,22 @@ export default function CampaignsPage() {
                       <div className="text-sm font-extrabold text-green-400 mt-0.5">{c.converted}</div>
                     </div>
                   </div>
+
+                  {/* Progress Bar */}
+                  {c.totalSponsors > 0 && (
+                    <div className="mb-4">
+                      <div className="flex justify-between text-[10px] text-foreground-muted mb-1">
+                        <span>Outreach progress</span>
+                        <span>{c.sent} / {c.totalSponsors} sent</span>
+                      </div>
+                      <div className="h-1.5 bg-background rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-brand-500 to-brand-400 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, Math.round((c.sent / c.totalSponsors) * 100))}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer Actions */}
@@ -219,13 +259,24 @@ export default function CampaignsPage() {
                   </div>
                   <div className="flex gap-2">
                     {c.status === "ACTIVE" ? (
-                      <button
-                        disabled={actioningId === c.id}
-                        onClick={() => handleAction(c.id, "pause")}
-                        className="text-xs font-bold px-4 py-2 border border-purple-500/30 hover:bg-purple-500/10 text-purple-400 rounded-xl transition-all"
-                      >
-                        Pause Campaign
-                      </button>
+                      <>
+                        <button
+                          disabled={processingId === c.id}
+                          onClick={() => handleProcessNow(c.id)}
+                          className="text-xs font-bold px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl shadow shadow-brand-500/20 transition-all disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                          {processingId === c.id ? (
+                            <><span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" /> Sending…</>
+                          ) : "⚡ Send Now"}
+                        </button>
+                        <button
+                          disabled={actioningId === c.id}
+                          onClick={() => handleAction(c.id, "pause")}
+                          className="text-xs font-bold px-4 py-2 border border-purple-500/30 hover:bg-purple-500/10 text-purple-400 rounded-xl transition-all"
+                        >
+                          Pause
+                        </button>
+                      </>
                     ) : (
                       <button
                         disabled={actioningId === c.id || c.status === "COMPLETED"}
